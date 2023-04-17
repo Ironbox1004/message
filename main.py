@@ -21,6 +21,12 @@ def create_up_down_count(list):
 
 if __name__ == '__main__':
 
+    dist_coeffs = np.array([-0.355054, 0.088915, -0.000127, 0.000481, 0.], dtype=np.float32)
+    intrinsic = np.array([[1257.36515, 0., 950.03113],
+                              [0., 1260.895, 499.81394],
+                              [0., 0., 1.]],
+                             dtype=np.float32)  # 1,3,3
+
     capture = cv2.VideoCapture(METAINFO.video_reader)
     down_counts, up_counts = create_up_down_count(Vehicle_sort_list.list)
 
@@ -28,6 +34,7 @@ if __name__ == '__main__':
         _, frame = capture.read()
         if frame is None:
             break
+        frame = cv2.undistort(frame, intrinsic, dist_coeffs)
         bboxes, scores, labels = detect.detect(frame)
         save_label_mask = torch.isin(labels.cpu(), torch.tensor(idx_list))
         bboxes, scores, labels = bboxes[save_label_mask], scores[save_label_mask], labels[save_label_mask]
