@@ -243,5 +243,8 @@ def plot_one_box(x, img, color):
     cv2.rectangle(img, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
     return img
 
+
+
+
 if __name__ == '__main__':
     pass

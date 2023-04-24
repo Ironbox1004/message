@@ -120,3 +120,18 @@ class person_sort_list:
           ]
 
 
+class ReverseDriving:
+    COUNT= 3
+    IS_ROAD_DIR= True
+    ROAD_DIR= 180
+    SCOPE= 30.0
+    REMOVE_TIME= 60
+    VECTOR_SIZE= 100
+    SPEED_THRESHOLD= 5
+
+class Congestion:
+    ROAD_LENGTH= 15  # meters
+    DEPARTURE_TIME= 5  # seconds
+    TIME_INTERVAL= 15  # seconds
+    FREE_VELOCITY= 50  # km/h
+    CAL_INTERVAL= 10  # ms cal vector
