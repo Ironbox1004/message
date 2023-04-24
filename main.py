@@ -5,19 +5,21 @@ import cv2
 import torch
 import numpy as np
 from tracker.byte_tracker import BYTETracker
+from nb_log import LogManager
+
+logger_vehicle_sort = LogManager('vehicle_sort').get_logger_and_add_handlers(10,
+                                                                        log_path='./log',
+                                                                        log_filename='vehicle_sort.log')
+
+logger_roi_detect = LogManager('roi_detect').get_logger_and_add_handlers(10,
+                                                                        log_path='./log',
+                                                                        log_filename='roi_detect.log')
+
 
 
 detect = Detect(METAINFO.engine2d_ckpt)
 Tracker = BYTETracker()
 
-#根据list的个数，创建出相同个数的up_count和down_count
-def create_up_down_count(list):
-    up_count = []
-    down_count = []
-    for i in range(len(list)):
-        up_count.append(0)
-        down_count.append(0)
-    return up_count, down_count
 
 if __name__ == '__main__':
 
@@ -28,7 +30,6 @@ if __name__ == '__main__':
                              dtype=np.float32)  # 1,3,3
 
     capture = cv2.VideoCapture(METAINFO.video_reader)
-    down_counts, up_counts = create_up_down_count(Vehicle_sort_list.list)
 
     while True:
         _, frame = capture.read()
@@ -50,14 +51,17 @@ if __name__ == '__main__':
             cv2.line(frame, Vehicle_sort_list.list[i][0], Vehicle_sort_list.list[i][1], (0, 255, 255), 4)
 
         results = area_sort.regional_judgment_sort(n_xyxycs, danger_area.roi)
-        down_counts, up_counts = sort_count.sort_count(n_xyxycs, Vehicle_sort_list.list)
+        vehicle_down_counts, vehicle_up_counts = sort_count.sort_count(n_xyxycs, Vehicle_sort_list.list)
 
         for bbox in results["bbox"]:
             im = plot_one_box(bbox, im, (0, 0, 255))
 
+        logger_vehicle_sort.info("vehicle_down_counts:{},vehicle_up_counts:{},".
+                                 format(vehicle_down_counts, vehicle_up_counts))
 
-        print(down_counts, up_counts)
-        print(results)
+        logger_roi_detect.info("bbox:{},track_id:{},".
+                               format(results["bbox"], results["track_id"]))
+
 
         cv2.imshow("demo", frame)
         cv2.waitKey(1)

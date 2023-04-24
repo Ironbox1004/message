@@ -9,3 +9,9 @@
 ### 支持多区域多线路判断
 
 ### 新增加图像去除畸变
+
+### 新增加日志管理脚本
+```
+pip install nb_log
+```
+参考链接: [nb_log安装使用](https://github.com/ydf0509/nb_log)
