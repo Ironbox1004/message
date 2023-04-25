@@ -1,7 +1,7 @@
 import numpy as np
 
 CLASSES2D = ('Car', 'Bus', 'Cycling', 'Pedestrian', 'Special_Car', 'Truck',
-              'Obstacle', 'Special_Target', 'Other_Objects')
+             'Obstacle', 'Special_Target', 'Other_Objects')
 class_to_idx = {cls: idx for idx, cls in enumerate(CLASSES2D)}
 idx_list = [class_to_idx[cls] for cls in ["Car", "Bus", "Truck", "Pedestrian"]]
 
@@ -9,14 +9,29 @@ idx_list = [class_to_idx[cls] for cls in ["Car", "Bus", "Truck", "Pedestrian"]]
 class METAINFO:
 
     engine2d_ckpt = "/home/chenzhen/dev-file/deploy-file/TensorRT-8.6.0.12/bin/yolox.engine"
-    video_reader =  "/home/chenzhen/data/video/hangzhou.mp4"
+    video_reader = "/home/chenzhen/data/video/hangzhou.mp4"
+
 
 class COLORS:
 
-    blue =  [255, 0, 0]
+    blue = [255, 0, 0]
     yellow = [0, 255, 255]
     red = [0, 0, 255]
     green = [0, 255, 0]
+
+
+class DataMessage:
+    sof = 0x5A
+    version = 0x01
+    appId = 0x01
+    type = 0x04
+    codec = 0x01
+    sequence = 100
+    timestamp = None
+    length = 100
+    payload = None
+    crc = 0xFFFF
+
 
 class MESSAGE:
 
@@ -31,12 +46,6 @@ class MESSAGE:
         "description": "****test message****"
     }
 
-    application_data = {
-        "type": 0x01,
-        "codec": 0x02,
-        "data": None
-    }
-
     data = {
         "type": 1,
         "ver": '01',
@@ -47,12 +56,16 @@ class MESSAGE:
         "ref_pos": None,
         "scene_type": 0,
         "objects_list": None,
-        "events_list": None,
+        "events_list": [],
         "detected_region": None,
         "obstacle_list": None
     }
-
-    events_list = {
+    application_data = {
+        "type": 0x01,
+        "codec": 0x02,
+        "data": data
+    }
+    event_data = {
         "event_id": 0,
         "event_type": 1,
         "description": "None",
@@ -96,42 +109,45 @@ class MESSAGE:
         "polygon": None
     }
 
+
 class Vehicle_sort_list:
     list = [
-        [[476,373],[567,374]],
-        [[648,271],[760,273]],
-        [[742,332],[893,333]],
-        [[912,265],[1060,266]],
-        [[1067,309],[1244,310]],
-        [[1217,242],[1335,244]]
+        [[476, 373], [567, 374]],
+        [[648, 271], [760, 273]],
+        [[742, 332], [893, 333]],
+        [[912, 265], [1060, 266]],
+        [[1067, 309], [1244, 310]],
+        [[1217, 242], [1335, 244]]
 
     ]
 
+
 class danger_area:
-  roi_1 = [[223, 128], [223,299], [447, 299], [447, 128]]
-  roi_2 = [[850, 23],[850,179],[1128, 179],[1128, 23]]
-  roi_3 = [[1445, 80], [1445,328],[1842,328],[1842, 80]]
-  roi = [roi_1, roi_2, roi_3]
+    roi_1 = [[223, 128], [223, 299], [447, 299], [447, 128]]
+    roi_2 = [[850, 23], [850, 179], [1128, 179], [1128, 23]]
+    roi_3 = [[1445, 80], [1445, 328], [1842, 328], [1842, 80]]
+    roi = [roi_1, roi_2, roi_3]
 
 
 class person_sort_list:
-  list = [
-      [[925, 0],[1080, 925]]
-          ]
+    list = [
+        [[925, 0], [1080, 925]]
+    ]
 
 
 class ReverseDriving:
-    COUNT= 3
-    IS_ROAD_DIR= True
-    ROAD_DIR= 180
-    SCOPE= 30.0
-    REMOVE_TIME= 60
-    VECTOR_SIZE= 100
-    SPEED_THRESHOLD= 5
+    COUNT = 3
+    IS_ROAD_DIR = True
+    ROAD_DIR = 180
+    SCOPE = 30.0
+    REMOVE_TIME = 60
+    VECTOR_SIZE = 100
+    SPEED_THRESHOLD = 5
+
 
 class Congestion:
-    ROAD_LENGTH= 15  # meters
-    DEPARTURE_TIME= 5  # seconds
-    TIME_INTERVAL= 15  # seconds
-    FREE_VELOCITY= 50  # km/h
-    CAL_INTERVAL= 10  # ms cal vector
+    ROAD_LENGTH = 15  # meters
+    DEPARTURE_TIME = 5  # seconds
+    TIME_INTERVAL = 15  # seconds
+    FREE_VELOCITY = 50  # km/h
+    CAL_INTERVAL = 10  # ms cal vector
