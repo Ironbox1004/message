@@ -1,6 +1,8 @@
 from custom_util import in_poly_area_dangerous
 from collections import Counter, deque
 from configs import ReverseDriving,Congestion
+from enum import Enum
+from typing import Dict
 import math
 
 
@@ -97,6 +99,10 @@ class Sort_Count:
 
         return self.down_count, self.up_count
 
+class ReverseVehicle:
+    def __init__(self, count: int, last_seen_time: float):
+        self.count = count
+        self.last_seen_time = last_seen_time
 
 class ReverseDrivingDetector:
     def isAngleInReverseRange(self, carDir: float) -> bool:
@@ -147,7 +153,7 @@ class ReverseDrivingDetector:
 
     def calcMean(self, angles: List[float]) -> float:
         n = len(angles)
-        if n<VECTOR_SIZE:
+        if n< ReverseDriving.VECTOR_SIZE:
             return 0
         angles.sort()
         median = self.calcMedian(angles)
@@ -181,6 +187,14 @@ class CongestionLevel(Enum):
     MODERATE = 3         # 中度拥堵
     SERIOUS = 4          # 严重拥堵
     INVALID = 5           # 无效值 
+
+# 定义目标物的数据结构
+class Target:
+    def __init__(self):
+        self.enter_time = datetime.now()
+        self.last_seen_time = datetime.now()
+        self.duration_time = 0.0
+        self.flag = False
 
 class CongestionDetector:
     def __init__(self):
