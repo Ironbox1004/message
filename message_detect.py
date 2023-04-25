@@ -1,5 +1,7 @@
 from collections import Counter, deque
 from configs import ReverseDriving, Congestion
+from enum import Enum
+from typing import Dict
 import math
 import time
 import threading
@@ -91,7 +93,7 @@ class Sort_Count:
                  up_count=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                  down_count=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                  already_counted=deque(maxlen=500), class_counter=Counter(), paths={},
-                 total_counter=0, track_cls=0, total_track=0,last_track_id=-1, angle=-1
+                 total_counter=0, track_cls=0, total_track=0, last_track_id=-1, angle=-1
                  ):
         self.already_counted = already_counted
         self.class_counter = class_counter
@@ -111,7 +113,7 @@ class Sort_Count:
         return midpoint
 
     def _ccw(self, A, B, C):
-        #判断三个点A、B、C是否组成了一个逆时针方向的三角形
+        # 判断三个点A、B、C是否组成了一个逆时针方向的三角形
         """
         :param A: point A
         :param B: point B
@@ -121,7 +123,7 @@ class Sort_Count:
         return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
 
     def _intersect(self, A, B, C, D):
-        #判断两条线段AB和CD是否相交
+        # 判断两条线段AB和CD是否相交
         """
         :param A: point A
         :param B: point B
@@ -132,7 +134,7 @@ class Sort_Count:
         return self._ccw(A, C, D) != self._ccw(B, C, D) and self._ccw(A, B, C) != self._ccw(A, B, D)
 
     def _vector_angle(self, midpoint, previous_midpoint):
-        #计算两个点构成的向量与x轴正方向之间的夹角
+        # 计算两个点构成的向量与x轴正方向之间的夹角
         """
         :param midpoint: current midpoint
         :param previous_midpoint: previous midpoint
@@ -176,6 +178,12 @@ class Sort_Count:
                             self.down_count[i] += 1
 
         return self.down_count, self.up_count
+
+
+class ReverseVehicle:
+    def __init__(self, count: int, last_seen_time: float):
+        self.count = count
+        self.last_seen_time = last_seen_time
 
 
 class ReverseDrivingDetector:
@@ -227,7 +235,8 @@ class ReverseDrivingDetector:
 
     def calcMean(self, angles: list[float]) -> float:
         n = len(angles)
-        if n < VECTOR_SIZE:
+
+        if n < ReverseDriving.VECTOR_SIZE:
             return 0
         angles.sort()
         median = self.calcMedian(angles)
@@ -261,6 +270,15 @@ class CongestionLevel(Enum):
     MODERATE = 3  # 中度拥堵
     SERIOUS = 4  # 严重拥堵
     INVALID = 5  # 无效值
+
+
+# 定义目标物的数据结构
+class Target:
+    def __init__(self):
+        self.enter_time = datetime.now()
+        self.last_seen_time = datetime.now()
+        self.duration_time = 0.0
+        self.flag = False
 
 
 class CongestionDetector:
@@ -311,10 +329,10 @@ class CongestionDetector:
                     self.m_vehicle_counts -= 1
                 elif elapsed_time > Congestion.DEPARTURE_TIME:
                     if target.flag != True:
-                        self.total_time += (
-                                                       current_time - target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
-                        self.m_targets[target_id].duration_time = (
-                                                                              current_time - target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
+                        self.total_time += (current_time -
+                                            target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
+                        self.m_targets[target_id].duration_time = (current_time -
+                                                                   target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
                         self.m_targets[target_id].flag = True
                         self.m_vehicle_counts += 1
                 else:
