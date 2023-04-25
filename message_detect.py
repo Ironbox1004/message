@@ -1,7 +1,9 @@
-from custom_util import in_poly_area_dangerous
 from collections import Counter, deque
-from configs import ReverseDriving,Congestion
+from configs import ReverseDriving, Congestion
 import math
+import time
+import threading
+import datetime
 
 
 class Regional_Judgment_Sort:
@@ -11,7 +13,60 @@ class Regional_Judgment_Sort:
         self.bbox = []
         self.track_id = []
 
-    def regional_judgment_sort(self, sort_results:list, roi:list):
+    def _is_poi_in_poly(self, pt, poly):
+        """
+        判断点是否在多边形内部的 pnpoly 算法
+        :param pt: 点坐标 [x,y]
+        :param poly: 点多边形坐标 [[x1,y1],[x2,y2],...]
+        :return: 点是否在多边形之内
+        """
+        nvert = len(poly)
+        vertx = []
+        verty = []
+        testx = pt[0]
+        testy = pt[1]
+        for item in poly:
+            vertx.append(item[0])
+            verty.append(item[1])
+        j = nvert - 1
+        res = False
+        for i in range(nvert):
+            if (verty[j] - verty[i]) == 0:
+                j = i
+                continue
+            x = (vertx[j] - vertx[i]) * (testy - verty[i]) / (verty[j] - verty[i]) + vertx[i]
+            if ((verty[i] > testy) != (verty[j] > testy)) and (testx < x):
+                res = not res
+            j = i
+        return res
+
+    def _in_poly_area_dangerous(self, xyxy, area_poly):
+        """
+        检测人体是否在多边形危险区域内
+        :param xyxy: 人体框的坐标
+        :param img_name: 检测的图片标号，用这个来对应图片的危险区域信息
+        :return: True -> 在危险区域内，False -> 不在危险区域内
+        """
+        # print(area_poly)
+        if not area_poly:  # 为空
+            return False
+        # 求物体框的中点
+        object_x1 = int(xyxy[0])
+        object_y1 = int(xyxy[1])
+        object_x2 = int(xyxy[2])
+        object_y2 = int(xyxy[3])
+        object_w = object_x2 - object_x1
+        object_h = object_y2 - object_y1
+        object_cx = object_x1 + (object_w / 2)
+        object_cy = object_y1 + (object_h / 2)
+        return self._is_poi_in_poly([object_cx, object_cy], area_poly)
+
+    def regional_judgment_sort(self, sort_results: list, roi: list):
+        """
+        :param sort_results: sort检测结果
+        :param roi: 危险区域列表
+        :return: 返回在危险区域内的人体框坐标和track_id
+        """
         if len(sort_results) > 0:
             for track in sort_results:
                 bbox = track[:4]
@@ -19,7 +74,7 @@ class Regional_Judgment_Sort:
                 track_id = track[4]
                 if label == 3:
                     for i in range(len(roi)):
-                        if in_poly_area_dangerous(bbox,roi[i]) == True:
+                        if self._in_poly_area_dangerous(bbox, roi[i]) == True:
                             self.bbox.append(bbox)
                             self.track_id.append(track_id)
             self.in_bbox = {
@@ -29,40 +84,65 @@ class Regional_Judgment_Sort:
 
         return self.in_bbox
 
+
 class Sort_Count:
 
-    def __init__(self,up_count=[0,0,0,0,0,0,0,0,0,0],down_count=[0,0,0,0,0,0,0,0,0,0],
-                 already_counted=deque(maxlen=500),class_counter=Counter(),paths={},
-                 total_counter=0,track_cls=0,total_track=0,
-                 last_track_id=-1,angle=-1
+    def __init__(self,
+                 up_count=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                 down_count=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                 already_counted=deque(maxlen=500), class_counter=Counter(), paths={},
+                 total_counter=0, track_cls=0, total_track=0,last_track_id=-1, angle=-1
                  ):
         self.already_counted = already_counted
         self.class_counter = class_counter
         self.paths = paths
-        self.total_counter, self.track_cls, self.up_count, self.down_count, self.total_track  = \
+        self.total_counter, self.track_cls, self.up_count, self.down_count, self.total_track = \
             total_counter, track_cls, up_count, down_count, total_track
         self.last_track_id = last_track_id
         self.angle = angle
 
-
-    def _tlbr_midpoint(self, box:list):
+    def _tlbr_midpoint(self, box: list):
+        """
+        :param box: [x1, y1, x2, y2]
+        :return: midpoint of box
+        """
         minX, minY, maxX, maxY = box
         midpoint = (int((minX + maxX) / 2), int((minY + maxY) / 2))  # minus y coordinates to get proper xy format
         return midpoint
 
-    def _ccw(self,A, B, C):
+    def _ccw(self, A, B, C):
+        #判断三个点A、B、C是否组成了一个逆时针方向的三角形
+        """
+        :param A: point A
+        :param B: point B
+        :param C: point C
+        :return: True if A, B, C are in counter-clockwise order
+        """
         return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
 
     def _intersect(self, A, B, C, D):
+        #判断两条线段AB和CD是否相交
+        """
+        :param A: point A
+        :param B: point B
+        :param C: point C
+        :param D: point D
+        :return: True if line segments AB and CD intersect
+        """
         return self._ccw(A, C, D) != self._ccw(B, C, D) and self._ccw(A, B, C) != self._ccw(A, B, D)
 
     def _vector_angle(self, midpoint, previous_midpoint):
+        #计算两个点构成的向量与x轴正方向之间的夹角
+        """
+        :param midpoint: current midpoint
+        :param previous_midpoint: previous midpoint
+        :return: angle between midpoint and previous_midpoint
+        """
         x = midpoint[0] - previous_midpoint[0]
         y = midpoint[1] - previous_midpoint[1]
         return math.degrees(math.atan2(y, x))
 
-
-    def sort_count(self, sort_results, line:list):
+    def sort_count(self, sort_results, line: list):
         if len(sort_results) > 0:
             for track in sort_results:
                 bbox = track[:4]
@@ -80,7 +160,7 @@ class Sort_Count:
 
                 for i in range(len(line)):
                     if self._intersect(midpoint, previous_midpoint, line[i][0], line[i][1]) \
-                        and track_id not in self.already_counted:
+                            and track_id not in self.already_counted:
 
                         self.class_counter[self.track_cls] += 1
                         self.total_counter += 1
@@ -138,24 +218,24 @@ class ReverseDrivingDetector:
             print(id, "no nixing")
             return -1
 
-    def calcMedian(self, angles: List[float]) -> float:
+    def calcMedian(self, angles: list[float]) -> float:
         n = len(angles)
         if n % 2 == 0:
-            return (angles[n//2 - 1] + angles[n//2]) / 2
+            return (angles[n // 2 - 1] + angles[n // 2]) / 2
         else:
-            return angles[n//2]
+            return angles[n // 2]
 
-    def calcMean(self, angles: List[float]) -> float:
+    def calcMean(self, angles: list[float]) -> float:
         n = len(angles)
-        if n<VECTOR_SIZE:
+        if n < VECTOR_SIZE:
             return 0
         angles.sort()
         median = self.calcMedian(angles)
         # print(sum(angles)/n)
         # print(median)
         diffs = [abs(angle - median) for angle in angles]
-        q1 = self.calcMedian(angles[:n//2])
-        q3 = self.calcMedian(angles[n//2 + n%2:])
+        q1 = self.calcMedian(angles[:n // 2])
+        q3 = self.calcMedian(angles[n // 2 + n % 2:])
         iqr = q3 - q1
         threshold = 1.5 * iqr
 
@@ -166,7 +246,7 @@ class ReverseDrivingDetector:
                 sumAngle += angle
                 count += 1
 
-        ReverseDriving.ROAD_DIR=sumAngle / count
+        ReverseDriving.ROAD_DIR = sumAngle / count
         return sumAngle / count
 
     def __init__(self):
@@ -175,12 +255,13 @@ class ReverseDrivingDetector:
 
 
 class CongestionLevel(Enum):
-    CLEAR = 0        # 畅通
-    BASIC_CLEAR = 1      # 基本畅通
-    LIGHT = 2            # 轻度拥堵
-    MODERATE = 3         # 中度拥堵
-    SERIOUS = 4          # 严重拥堵
-    INVALID = 5           # 无效值 
+    CLEAR = 0  # 畅通
+    BASIC_CLEAR = 1  # 基本畅通
+    LIGHT = 2  # 轻度拥堵
+    MODERATE = 3  # 中度拥堵
+    SERIOUS = 4  # 严重拥堵
+    INVALID = 5  # 无效值
+
 
 class CongestionDetector:
     def __init__(self):
@@ -190,8 +271,7 @@ class CongestionDetector:
         self.m_vehicle_counts = 0  # 时间间隔内，通过路段的车辆数
         self.m_average_speed = 0
 
-
-    def addObject(self,id: int):
+    def addObject(self, id: int):
         if self.isInmap(id):
             self.updateTarget(id)
         else:
@@ -231,8 +311,10 @@ class CongestionDetector:
                     self.m_vehicle_counts -= 1
                 elif elapsed_time > Congestion.DEPARTURE_TIME:
                     if target.flag != True:
-                        self.total_time += (current_time - target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
-                        self.m_targets[target_id].duration_time = (current_time - target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
+                        self.total_time += (
+                                                       current_time - target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
+                        self.m_targets[target_id].duration_time = (
+                                                                              current_time - target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
                         self.m_targets[target_id].flag = True
                         self.m_vehicle_counts += 1
                 else:
@@ -269,18 +351,3 @@ class CongestionDetector:
             return CongestionLevel.MODERATE
         else:
             return CongestionLevel.SERIOUS
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

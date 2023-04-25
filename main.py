@@ -13,13 +13,15 @@ logger_vehicle_sort = LogManager('vehicle_sort').get_logger_and_add_handlers(10,
 
 logger_roi_detect = LogManager('roi_detect').get_logger_and_add_handlers(10,
                                                                         log_path='./log',
+                                                                        log_filename='roi_detect.log')
 
 logger_reverse_driving = LogManager('ReverseDrivingDetector').get_logger_and_add_handlers(10,
                                                                         log_path='./log',
                                                                         log_filename='reverse_driving.log')
+
 logger_congestion = LogManager('CongestionDetector').get_logger_and_add_handlers(10,
                                                                         log_path='./log',
-                                                                        log_filename='Congestion.log')                                                                        log_filename='roi_detect.log')
+                                                                        log_filename='Congestion.log')
 
 
 
