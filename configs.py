@@ -26,11 +26,17 @@ class DataMessage:
     appId = 0x01
     type = 0x04
     codec = 0x01
-    sequence = 100
+    sequence = 0x0001
     timestamp = None
     length = 100
     payload = None
     crc = 0xFFFF
+
+
+class PositionObject:
+    lat = 0
+    lon = 0
+    ele = 0
 
 
 class MESSAGE:
@@ -45,7 +51,12 @@ class MESSAGE:
         "status": 0x01,
         "description": "****test message****"
     }
-
+    PositionObject = {
+        "lat": 0,
+        "lon": 0,
+        "ele": 0
+    }
+    # type1 业务消息
     data = {
         "type": 1,
         "ver": '01',
@@ -53,32 +64,33 @@ class MESSAGE:
         "min_of_year": None,
         "second": None,
         "fus_dev_id": "1",
-        "ref_pos": None,
+        "ref_pos": PositionObject,
         "scene_type": 0,
         "objects_list": None,
         "events_list": [],
-        "detected_region": None,
-        "obstacle_list": None
+        "detected_region": [],
+        "obstacle_list": []
     }
     application_data = {
         "type": 0x01,
         "codec": 0x02,
         "data": data
     }
-    event_data = {
-        "event_id": 0,
-        "event_type": 1,
-        "description": "None",
-        "event_pos": None,
-        "event_obj_id": None,
-        "event_radius": None,
-        "priority": None,
-        "ref_path_list": None,
-        "ref_link_list": None,
-        "event_source": 5,
-        "event_confid": None,
-        "time_details": None
-    }
+
+    # event_data = {
+    #     "event_id": 0,
+    #     "event_type": 1,
+    #     "description": "None",
+    #     "event_pos": PositionObject,
+    #     "event_obj_id": None,
+    #     "event_radius": None,
+    #     "priority": None,
+    #     "ref_path_list": None,
+    #     "ref_link_list": None,
+    #     "event_source": 5,
+    #     "event_confid": None,
+    #     "time_details": None
+    # }
 
     objects_list = {
         "object_id": None,
@@ -108,6 +120,27 @@ class MESSAGE:
         "tracking": None,
         "polygon": None
     }
+
+
+class event_data:
+    event_id = 0
+    event_type = 1
+    description = "None"
+    event_pos = PositionObject()
+    event_obj_id = None
+    event_radius = None
+    priority = None
+    ref_path_list = None
+    ref_link_list = None
+    event_source = 5
+    event_confid = None
+    time_details = None
+
+
+class LaneInfo:
+    laneNums = 4
+    laneIdList = [2, 1, 5, 7]
+    laneAngles = [90, 180, 160, 70]
 
 
 class Vehicle_sort_list:
