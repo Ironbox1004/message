@@ -1,12 +1,12 @@
 from collections import Counter, deque
-from configs import ReverseDriving, Congestion
+from configs import ReverseDriving, Congestion,Vehicle_line_head
 from enum import Enum
-from typing import Dict, list
-from main import logger_congestion, logger_reverse_driving
+from typing import Dict
 import math
 import time
 import threading
-from datetime import datetime
+import datetime
+import numpy as np
 
 
 class Regional_Judgment_Sort:
@@ -37,8 +37,7 @@ class Regional_Judgment_Sort:
             if (verty[j] - verty[i]) == 0:
                 j = i
                 continue
-            x = (vertx[j] - vertx[i]) * (testy - verty[i]) / \
-                (verty[j] - verty[i]) + vertx[i]
+            x = (vertx[j] - vertx[i]) * (testy - verty[i]) / (verty[j] - verty[i]) + vertx[i]
             if ((verty[i] > testy) != (verty[j] > testy)) and (testx < x):
                 res = not res
             j = i
@@ -87,7 +86,64 @@ class Regional_Judgment_Sort:
             }
 
         return self.in_bbox
+    def _in_poly_area_line(self, xyxy, area_poly):
+        """
+        检测人体是否在多边形危险区域内
+        :param xyxy: 人体框的坐标
+        :param img_name: 检测的图片标号，用这个来对应图片的危险区域信息
+        :return: True -> 在危险区域内，False -> 不在危险区域内
+        """
+        # print(area_poly)
+        if not area_poly:  # 为空
+            return False
+        # 求物体框的底边中点
+        object_x1 = int(xyxy[0])
+        object_y1 = int(xyxy[1])
+        object_x2 = int(xyxy[2])
+        object_y2 = int(xyxy[3])
+        object_w = object_x2 - object_x1
+        object_h = object_y2 - object_y1
+        object_cx = object_x1 + (object_w / 2)
+        object_cy = object_y1 + object_h*0.9
+        return self._is_poi_in_poly([object_cx, object_cy], area_poly)
+    
+    def get_length(self, xyxy, area_mark):
+        head = Vehicle_line_head.list[area_mark]
+        object_x1 = int(xyxy[0])
+        object_y1 = int(xyxy[1])
+        object_x2 = int(xyxy[2])
+        object_y2 = int(xyxy[3])
+        object_w = object_x2 - object_x1
+        object_h = object_y2 - object_y1
+        object_cx = object_x1 + (object_w / 2)
+        object_cy = object_y1 + (object_h / 2)
+        length_single =  int(2/73*np.sqrt((object_cx-head[0])**2+(object_cy-head[1])**2))
+        return length_single
 
+    def regional_judgment_length(self, sort_results: list, roi: list):
+        """
+        :param sort_results: sort检测结果
+        :param roi: 车道区域列表
+        :return: 返回在区域内的最大长度
+        """
+        length_now = [0,0,0,0,0,0]
+        count_now = [0,0,0,0,0,0]
+        if len(sort_results) > 0:
+            for track in sort_results:
+                bbox = track[:4]
+                label = track[-1]
+                track_id = track[4]
+                if label != 3:
+                    for i in range(len(roi)):
+                        if self._in_poly_area_line(bbox, roi[i]) == True:
+                            length_now[i]=max(self.get_length(bbox,i),length_now[i])
+                            count_now[i]+=1
+        result_now = {
+                "length": length_now,
+                "count": count_now
+            }
+
+        return result_now
 
 class Sort_Count:
 
@@ -111,8 +167,7 @@ class Sort_Count:
         :return: midpoint of box
         """
         minX, minY, maxX, maxY = box
-        # minus y coordinates to get proper xy format
-        midpoint = (int((minX + maxX) / 2), int((minY + maxY) / 2))
+        midpoint = (int((minX + maxX) / 2), int((minY + maxY) / 2))  # minus y coordinates to get proper xy format
         return midpoint
 
     def _ccw(self, A, B, C):
@@ -153,8 +208,7 @@ class Sort_Count:
                 bbox = track[:4]
                 track_id = track[4]
                 midpoint = self._tlbr_midpoint(bbox)
-                # 1080==im.shape[0]
-                origin_midpoint = (midpoint[0], 1920 - midpoint[1])
+                origin_midpoint = (midpoint[0], 1920 - midpoint[1])  # 1080==im.shape[0]
 
                 if track_id not in self.paths:
                     self.paths[track_id] = deque(maxlen=2)
@@ -162,8 +216,7 @@ class Sort_Count:
 
                 self.paths[track_id].append(midpoint)
                 previous_midpoint = self.paths[track_id][0]
-                origin_previous_midpoint = (
-                    previous_midpoint[0], 1920 - previous_midpoint[1])  # 1080==im.shape[0]
+                origin_previous_midpoint = (previous_midpoint[0], 1920 - previous_midpoint[1])  # 1080==im.shape[0]
 
                 for i in range(len(line)):
                     if self._intersect(midpoint, previous_midpoint, line[i][0], line[i][1]) \
@@ -172,11 +225,9 @@ class Sort_Count:
                         self.class_counter[self.track_cls] += 1
                         self.total_counter += 1
 
-                        # Set already counted for ID to true.
-                        self.already_counted.append(track_id)
+                        self.already_counted.append(track_id)  # Set already counted for ID to true.
 
-                        self.angle = self._vector_angle(
-                            origin_midpoint, origin_previous_midpoint)
+                        self.angle = self._vector_angle(origin_midpoint, origin_previous_midpoint)
 
                         if self.angle > 0:
                             self.up_count[i] += 1
@@ -195,15 +246,11 @@ class ReverseVehicle:
 
 class ReverseDrivingDetector:
     def isAngleInReverseRange(self, carDir: float) -> bool:
-        logger_reverse_driving.info(
-            "isAngleInReverseRange :"+"road_dir="+str(self.ROAD_DIR)+" carDir="+str(carDir))
         # 计算角度ROAD_DIR的反向角度ra
-        ra = self.ROAD_DIR + 180 if self.ROAD_DIR < 180 else self.ROAD_DIR - 180
+        ra = ReverseDriving.ROAD_DIR + 180 if ReverseDriving.ROAD_DIR < 180 else ReverseDriving.ROAD_DIR - 180
 
         # 计算角度b与ra的差值db，考虑边界情况
         db = carDir - ra
-        logger_reverse_driving.info(
-            "isAngleInReverseRange :"+" ra= "+str(ra)+" db="+str(db))
         if db > 180:
             db -= 360
         elif db < -180:
@@ -214,8 +261,7 @@ class ReverseDrivingDetector:
 
     def checkForReverseDriving(self, id: int, carDir: float, speed: float) -> int:
         if self.isAngleInReverseRange(carDir) and speed >= ReverseDriving.SPEED_THRESHOLD:
-            logger_reverse_driving.info(
-                "checkForReverseDriving: "+str(id)+" ReverseDriving")
+            print("xiangfan")
             current_time = time.monotonic()
             # 去掉map中触发逆行较久的数据
             for i in list(self.count_map.keys()):
@@ -229,27 +275,23 @@ class ReverseDrivingDetector:
             self.count_map[id].count += 1
             self.count_map[id].last_seen_time = current_time
 
-            # 当检测到当前id车辆的逆行次数超过ReverseDriving.COUNT时，触发逆行事件报警，并将该车的逆行计数清零
             if self.count_map[id].count >= ReverseDriving.COUNT:
-                logger_reverse_driving.info(
-                    "checkForReverseDriving: "+str(id)+" ReverseDriving")
-                self.count_map[id].count = 0
+                print(id, "nixingdetector")
                 return id
             else:
                 return -1
         else:
-            logger_reverse_driving.info(
-                "checkForReverseDriving: "+str(id)+" no ReverseDriving")
+            print(id, "no nixing")
             return -1
 
-    def calcMedian(self, angles: list[float]) -> float:
+    def calcMedian(self, angles):
         n = len(angles)
         if n % 2 == 0:
             return (angles[n // 2 - 1] + angles[n // 2]) / 2
         else:
             return angles[n // 2]
 
-    def calcMean(self, angles: list[float]) -> float:
+    def calcMean(self, angles):
         n = len(angles)
 
         if n < ReverseDriving.VECTOR_SIZE:
@@ -271,21 +313,21 @@ class ReverseDrivingDetector:
                 sumAngle += angle
                 count += 1
 
-        self.ROAD_DIR = sumAngle / count
+        ReverseDriving.ROAD_DIR = sumAngle / count
         return sumAngle / count
 
-    def __init__(self, roadDir):
+    def __init__(self):
         self.count_map = {}
         self.angles = []
-        self.ROAD_DIR = roadDir
 
 
 class CongestionLevel(Enum):
     CLEAR = 0  # 畅通
-    LIGHT = 1  # 轻度拥堵
-    MODERATE = 2  # 中度拥堵
-    SERIOUS = 3  # 严重拥堵
-    INVALID = 4  # 无效值
+    BASIC_CLEAR = 1  # 基本畅通
+    LIGHT = 2  # 轻度拥堵
+    MODERATE = 3  # 中度拥堵
+    SERIOUS = 4  # 严重拥堵
+    INVALID = 5  # 无效值
 
 
 # 定义目标物的数据结构
@@ -336,8 +378,7 @@ class CongestionDetector:
             current_time = datetime.now()
             self.m_mutex.acquire()
             for target_id, target in list(self.m_targets.items()):
-                elapsed_time = (
-                    current_time - target.last_seen_time).total_seconds()
+                elapsed_time = (current_time - target.last_seen_time).total_seconds()
                 if elapsed_time > Congestion.TIME_INTERVAL:
                     self.total_time -= self.m_targets[target_id].duration_time
                     if self.total_time < 0.00001:
@@ -357,34 +398,30 @@ class CongestionDetector:
             self.m_mutex.release()
 
     def getTotalTime(self):
-        logger_congestion.info("getTotalTime "+str(self.total_time))
         return self.total_time
 
     def isInmap(self, id: int):
         return id in self.m_targets
 
     def getVehicleCounts(self):
-        logger_congestion.info("getVehicleCounts "+str(self.m_vehicle_counts))
         return self.m_vehicle_counts
 
     def get_average_speed(self):
         if self.total_time <= 0:
             self.m_average_speed = 0
         else:
-            self.m_average_speed = Congestion.ROAD_LENGTH * \
-                self.m_vehicle_counts / self.total_time * 3.6
-        logger_congestion.info("get_average_speed "+str(self.m_average_speed))
+            self.m_average_speed = Congestion.ROAD_LENGTH * self.m_vehicle_counts / self.total_time * 3.6
         return self.m_average_speed
 
     def check_congestion_level(self):
         ratio = self.m_average_speed / Congestion.FREE_VELOCITY
-        logger_congestion.info("check_congestion_level "+str(ratio))
-
         if ratio == 0:
             return CongestionLevel.INVALID
         elif ratio > 0.7:
             return CongestionLevel.CLEAR
         elif ratio > 0.5:
+            return CongestionLevel.BASIC_CLEAR
+        elif ratio > 0.4:
             return CongestionLevel.LIGHT
         elif ratio > 0.3:
             return CongestionLevel.MODERATE

@@ -1,19 +1,9 @@
-import sys
-from pathlib import Path
-
-FILE = Path(__file__).resolve()
-ROOT = FILE.parents[0]
-sys.path.append(str(ROOT))
-
-
-
 from message_detect import Regional_Judgment_Sort, Sort_Count
-from configs import Vehicle_sort_list, METAINFO, idx_list, danger_area,MESSAGE
+from configs import *
 from custom_util import Detect, draw_bbox, plot_one_box
 import cv2
 import torch
 import numpy as np
-import datetime
 from tracker.byte_tracker import BYTETracker
 from nb_log import LogManager
 
@@ -33,66 +23,13 @@ logger_congestion = LogManager('CongestionDetector').get_logger_and_add_handlers
                                                                         log_path='./log',
                                                                         log_filename='Congestion.log')
 
+
+
 detect = Detect(METAINFO.engine2d_ckpt)
 Tracker = BYTETracker()
 
-def state_message_publisher(publishDate,
-                            installLocation="/home/../ros/catkin_ws/src/..",
-                            logLocation="/home/../ros/catkin_ws/src/../log/",
-                            description="****test message****"):
-	# ROS节点初始化
-    rospy.init_node('state_message_publisher', anonymous=True)
-
-	# 创建一个Publisher，发布名为/message_info的topic，消息类型为event_detection_topic::Message，队列长度10
-    state_message_info_pub = rospy.Publisher('/message_info', Message, queue_size=1)
-
-    application_state = MESSAGE.application_state
-    application_state['publishDate'] = publishDate
-    application_state['installLocation'] = installLocation
-    application_state['logLocation'] = logLocation
-    application_state['description'] = description
-
-    state_json_result = json.dumps(application_state)
-    state_json_result = bytes(state_json_result, encoding="utf8")
-
-    # 设置循环的频率
-    rate = rospy.Rate(10)
-    while not rospy.is_shutdown():
-
-        state_message_msg = Message()
-        state_message_msg.sof = 0x5A
-        state_message_msg.version = 0x01
-        state_message_msg.appId = 0x01
-        state_message_msg.type = 0x01
-        state_message_msg.codec = 0x01
-        state_message_msg.sequence = 100
-        state_message_msg.timestamp = rospy.Time.now().to_nsec() // 1000000
-        state_message_msg.length = 100
-        state_message_msg.payload = state_json_result
-        state_message_msg.crc = 0xFFFF
-
-        state_message_info_pub.publish(state_message_msg)
-        rospy.loginfo("Publsh state_message_msg[%d, %d, %d, %d, %d, %d, %s, %d, %s, %d ]",
-                      state_message_msg.sof, state_message_msg.version, state_message_msg.appId, state_message_msg.type,
-                      state_message_msg.codec, state_message_msg.sequence, state_message_msg.timestamp,
-                      state_message_msg.length,
-                      state_message_msg.payload, state_message_msg.crc)
-
-        rate.sleep()
-
-
-
 
 if __name__ == '__main__':
-
-    now_python = datetime.datetime.now()
-    time_str = now_python.strftime("%Y-%m-%d %H:%M:%S")
-
-    try:
-        state_message_publisher(time_str)
-
-    except rospy.ROSInterruptException:
-        pass
 
     dist_coeffs = np.array([-0.355054, 0.088915, -0.000127, 0.000481, 0.], dtype=np.float32)
     intrinsic = np.array([[1257.36515, 0., 950.03113],
@@ -128,11 +65,14 @@ if __name__ == '__main__':
             im = plot_one_box(bbox, im, (0, 0, 255))
 
         logger_vehicle_sort.info("vehicle_down_counts:{},vehicle_up_counts:{},".
-                                 format(vehicle_down_counts, vehicle_up_counts))
+                                format(vehicle_down_counts, vehicle_up_counts))
 
         logger_roi_detect.info("bbox:{},track_id:{},".
                                format(results["bbox"], results["track_id"]))
-
+        #results2 = area_sort.regional_judgment_length(n_xyxycs, Vehicle_area_list.list)
+        #print(results2)
+    
+        
 
         cv2.imshow("demo", frame)
         cv2.waitKey(1)
