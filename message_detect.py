@@ -10,13 +10,11 @@ import numpy as np
 
 
 class RegionalJudgmentSort:
-
     def __init__(self):
         self.in_bbox = {}
         self.result_now = {}
         self.bbox = []
         self.track_id = []
-
     def _is_poi_in_poly(self, pt, poly):
         """
         判断点是否在多边形内部的 pnpoly 算法
@@ -43,7 +41,6 @@ class RegionalJudgmentSort:
                 res = not res
             j = i
         return res
-
     def _in_poly_area_dangerous(self, xyxy, area_poly):
         """
         检测人体是否在多边形危险区域内
@@ -64,7 +61,6 @@ class RegionalJudgmentSort:
         object_cx = object_x1 + (object_w / 2)
         object_cy = object_y1 + (object_h / 2)
         return self._is_poi_in_poly([object_cx, object_cy], area_poly)
-
     def _in_poly_area_line(self, xyxy, area_poly):
         """
         检测人体是否在多边形危险区域内
@@ -72,7 +68,6 @@ class RegionalJudgmentSort:
         :param img_name: 检测的图片标号，用这个来对应图片的危险区域信息
         :return: True -> 在危险区域内，False -> 不在危险区域内
         """
-        # print(area_poly)
         if not area_poly:  # 为空
             return False
         # 求物体框的底边中点
@@ -83,9 +78,8 @@ class RegionalJudgmentSort:
         object_w = object_x2 - object_x1
         object_h = object_y2 - object_y1
         object_cx = object_x1 + (object_w / 2)
-        object_cy = object_y1 + object_h*0.9
+        object_cy = object_y1 + object_h * 0.9
         return self._is_poi_in_poly([object_cx, object_cy], area_poly)
-    
     def get_length(self, xyxy, area_mark):
         head = Vehicle_line_head.list[area_mark]
         object_x1 = int(xyxy[0])
@@ -96,32 +90,29 @@ class RegionalJudgmentSort:
         object_h = object_y2 - object_y1
         object_cx = object_x1 + (object_w / 2)
         object_cy = object_y1 + (object_h / 2)
-        length_single =  int(2/73*np.sqrt((object_cx-head[0])**2+(object_cy-head[1])**2))
+        length_single = int(2 / 73 * np.sqrt((object_cx - head[0]) ** 2 + (object_cy - head[1]) ** 2))
         return length_single
-
     def regional_judgment_length(self, sort_results: list, roi: list):
         """
         :param sort_results: sort检测结果
         :param roi: 车道区域列表
         :return: 返回在区域内的最大长度
         """
-        length_now = [0,0,0,0,0,0]
-        count_now = [0,0,0,0,0,0]
+        length_now = [0, 0, 0, 0, 0, 0]
+        count_now = [0, 0, 0, 0, 0, 0]
         if len(sort_results) > 0:
             for track in sort_results:
                 bbox = track[:4]
                 label = track[-1]
-                track_id = track[4]
                 if label != 3:
                     for i in range(len(roi)):
                         if self._in_poly_area_line(bbox, roi[i]) == True:
-                            length_now[i]=max(self.get_length(bbox,i),length_now[i])
-                            count_now[i]+=1
+                            length_now[i] = max(self.get_length(bbox, i), length_now[i])
+                            count_now[i] += 1
         self.result_now = {
-                "length": length_now,
-                "count": count_now
-            }
-
+            "length": length_now,
+            "count": count_now
+        }
     def regional_judgment_sort(self, sort_results: list, roi: list):
         """
         :param sort_results: sort检测结果
@@ -142,14 +133,13 @@ class RegionalJudgmentSort:
                 "bbox": self.bbox,
                 "track_id": self.track_id
             }
-
     def getPersonResult(self):
         return self.in_bbox
 
     def getVehicleResult(self):
         return self.result_now
 
-class SortCount:
+class VeSortCount:
     def __init__(self,
                  up_count=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                  down_count=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -163,7 +153,6 @@ class SortCount:
             total_counter, track_cls, up_count, down_count, total_track
         self.last_track_id = last_track_id
         self.angle = angle
-
     def _tlbr_midpoint(self, box: list):
         """
         :param box: [x1, y1, x2, y2]
@@ -172,7 +161,6 @@ class SortCount:
         minX, minY, maxX, maxY = box
         midpoint = (int((minX + maxX) / 2), int((minY + maxY) / 2))  # minus y coordinates to get proper xy format
         return midpoint
-
     def _ccw(self, A, B, C):
         # 判断三个点A、B、C是否组成了一个逆时针方向的三角形
         """
@@ -182,7 +170,6 @@ class SortCount:
         :return: True if A, B, C are in counter-clockwise order
         """
         return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
-
     def _intersect(self, A, B, C, D):
         # 判断两条线段AB和CD是否相交
         """
@@ -205,7 +192,7 @@ class SortCount:
         y = midpoint[1] - previous_midpoint[1]
         return math.degrees(math.atan2(y, x))
 
-    def sortcount(self, sort_results, line: list):
+    def veSortCount(self, sort_results, line: list):
         if len(sort_results) > 0:
             for track in sort_results:
                 bbox = track[:4]
@@ -237,61 +224,57 @@ class SortCount:
 
                         if self.angle < 0:
                             self.down_count[i] += 1
-
-    def getSortCountResult(self):
+    def getVeSortCountResult(self):
         return self.up_count, self.down_count
 
-class Pe_Sort_Count:
+class PeSortCount:
     def __init__(self,
                  boxes=[],
                  indexIDs=[],
-                 memory={},):
+                 memory={},
+                 count=[0, 0, 0, 0]):
         super().__init__()
         self.boxes = boxes
         self.indexIDs = indexIDs
         self.memory = memory
-        self.count = [0,0,0,0]
-
-    def _ccw(self,A, B, C):
+        self.count = count
+    def _ccw(self, A, B, C):
         return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
-
     def _intersect(self, A, B, C, D):
         return self._ccw(A, C, D) != self._ccw(B, C, D) and self._ccw(A, B, C) != self._ccw(A, B, D)
-
-    def __call__(self, sort_results, roi):
+    def veSortCount(self, sort_results, roi):
         self.previous = self.memory.copy()
+        self.indexIDs.clear()
+        self.boxes.clear()
+
         for track in sort_results:
             self.boxes.append([track[0], track[1], track[2], track[3]])
             self.indexIDs.append(int(track[4]))
             self.memory[self.indexIDs[-1]] = self.boxes[-1]
             label = track[-1]
+
         if label == 3:
-            i = int(0)
-            for box in self.boxes:
+            for i, box in enumerate(self.boxes):
                 (x, y) = (int(box[0]), int(box[1]))
                 (w, h) = (int(box[2]), int(box[3]))
+
                 if self.indexIDs[i] in self.previous:
                     previous_box = self.previous[self.indexIDs[i]]
                     (x2, y2) = (int(previous_box[0]), int(previous_box[1]))
                     (w2, h2) = (int(previous_box[2]), int(previous_box[3]))
                     p1 = (int(x2 + (w2 - x2) / 2), int(y2 + (h2 - y2) / 2))
                     p0 = (int(x + (w - x) / 2), int(y + (h - y) / 2))
+
                     for j in range(len(roi)):
                         if self._intersect(p0, p1, roi[j][0], roi[j][1]):
                             self.count[j] += 1
-                            del self.previous[self.indexIDs[i]]
-                            # del self.memory[self.indexIDs[i]]
-                i += 1
-
-    def get_count(self):
+    def getPeSortCountResult(self):
         return self.count
-
 
 class ReverseVehicle:
     def __init__(self, count: int, last_seen_time: float):
         self.count = count
         self.last_seen_time = last_seen_time
-
 
 class ReverseDrivingDetector:
     def isAngleInReverseRange(self, carDir: float) -> bool:
@@ -304,10 +287,8 @@ class ReverseDrivingDetector:
             db -= 360
         elif db < -180:
             db += 360
-
         # 判断角度b是否在角度a的反向范围内上下30度
         return db >= -ReverseDriving.SCOPE and db <= ReverseDriving.SCOPE
-
     def checkForReverseDriving(self, id: int, carDir: float, speed: float) -> int:
         if self.isAngleInReverseRange(carDir) and speed >= ReverseDriving.SPEED_THRESHOLD:
             print("xiangfan")
@@ -332,14 +313,12 @@ class ReverseDrivingDetector:
         else:
             print(id, "no nixing")
             return -1
-
     def calcMedian(self, angles):
         n = len(angles)
         if n % 2 == 0:
             return (angles[n // 2 - 1] + angles[n // 2]) / 2
         else:
             return angles[n // 2]
-
     def calcMean(self, angles):
         n = len(angles)
 
@@ -369,7 +348,6 @@ class ReverseDrivingDetector:
         self.count_map = {}
         self.angles = []
 
-
 class CongestionLevel(Enum):
     CLEAR = 0  # 畅通
     BASIC_CLEAR = 1  # 基本畅通
@@ -378,7 +356,6 @@ class CongestionLevel(Enum):
     SERIOUS = 4  # 严重拥堵
     INVALID = 5  # 无效值
 
-
 # 定义目标物的数据结构
 class Target:
     def __init__(self):
@@ -386,7 +363,6 @@ class Target:
         self.last_seen_time = datetime.now()
         self.duration_time = 0.0
         self.flag = False
-
 
 class CongestionDetector:
     def __init__(self):
