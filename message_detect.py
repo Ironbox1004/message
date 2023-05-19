@@ -1,5 +1,5 @@
 from collections import Counter, deque
-from configs import ReverseDriving, Congestion,Vehicle_line_head
+from configs import ReverseDriving, Congestion, Vehicle_line_head
 from enum import Enum
 from typing import Dict
 import math
@@ -9,10 +9,11 @@ import datetime
 import numpy as np
 
 
-class Regional_Judgment_Sort:
+class RegionalJudgmentSort:
 
     def __init__(self):
         self.in_bbox = {}
+        self.result_now = {}
         self.bbox = []
         self.track_id = []
 
@@ -64,28 +65,6 @@ class Regional_Judgment_Sort:
         object_cy = object_y1 + (object_h / 2)
         return self._is_poi_in_poly([object_cx, object_cy], area_poly)
 
-    def regional_judgment_sort(self, sort_results: list, roi: list):
-        """
-        :param sort_results: sort检测结果
-        :param roi: 危险区域列表
-        :return: 返回在危险区域内的人体框坐标和track_id
-        """
-        if len(sort_results) > 0:
-            for track in sort_results:
-                bbox = track[:4]
-                label = track[-1]
-                track_id = track[4]
-                if label == 3:
-                    for i in range(len(roi)):
-                        if self._in_poly_area_dangerous(bbox, roi[i]) == True:
-                            self.bbox.append(bbox)
-                            self.track_id.append(track_id)
-            self.in_bbox = {
-                "bbox": self.bbox,
-                "track_id": self.track_id
-            }
-
-        return self.in_bbox
     def _in_poly_area_line(self, xyxy, area_poly):
         """
         检测人体是否在多边形危险区域内
@@ -138,15 +117,39 @@ class Regional_Judgment_Sort:
                         if self._in_poly_area_line(bbox, roi[i]) == True:
                             length_now[i]=max(self.get_length(bbox,i),length_now[i])
                             count_now[i]+=1
-        result_now = {
+        self.result_now = {
                 "length": length_now,
                 "count": count_now
             }
 
-        return result_now
+    def regional_judgment_sort(self, sort_results: list, roi: list):
+        """
+        :param sort_results: sort检测结果
+        :param roi: 危险区域列表
+        :return: 返回在危险区域内的人体框坐标和track_id
+        """
+        if len(sort_results) > 0:
+            for track in sort_results:
+                bbox = track[:4]
+                label = track[-1]
+                track_id = track[4]
+                if label == 3:
+                    for i in range(len(roi)):
+                        if self._in_poly_area_dangerous(bbox, roi[i]) == True:
+                            self.bbox.append(bbox)
+                            self.track_id.append(track_id)
+            self.in_bbox = {
+                "bbox": self.bbox,
+                "track_id": self.track_id
+            }
 
-class Sort_Count:
+    def getPersonResult(self):
+        return self.in_bbox
 
+    def getVehicleResult(self):
+        return self.result_now
+
+class SortCount:
     def __init__(self,
                  up_count=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                  down_count=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -202,7 +205,7 @@ class Sort_Count:
         y = midpoint[1] - previous_midpoint[1]
         return math.degrees(math.atan2(y, x))
 
-    def sort_count(self, sort_results, line: list):
+    def sortcount(self, sort_results, line: list):
         if len(sort_results) > 0:
             for track in sort_results:
                 bbox = track[:4]
@@ -235,7 +238,53 @@ class Sort_Count:
                         if self.angle < 0:
                             self.down_count[i] += 1
 
-        return self.down_count, self.up_count
+    def getSortCountResult(self):
+        return self.up_count, self.down_count
+
+class Pe_Sort_Count:
+    def __init__(self,
+                 boxes=[],
+                 indexIDs=[],
+                 memory={},):
+        super().__init__()
+        self.boxes = boxes
+        self.indexIDs = indexIDs
+        self.memory = memory
+        self.count = [0,0,0,0]
+
+    def _ccw(self,A, B, C):
+        return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+
+    def _intersect(self, A, B, C, D):
+        return self._ccw(A, C, D) != self._ccw(B, C, D) and self._ccw(A, B, C) != self._ccw(A, B, D)
+
+    def __call__(self, sort_results, roi):
+        self.previous = self.memory.copy()
+        for track in sort_results:
+            self.boxes.append([track[0], track[1], track[2], track[3]])
+            self.indexIDs.append(int(track[4]))
+            self.memory[self.indexIDs[-1]] = self.boxes[-1]
+            label = track[-1]
+        if label == 3:
+            i = int(0)
+            for box in self.boxes:
+                (x, y) = (int(box[0]), int(box[1]))
+                (w, h) = (int(box[2]), int(box[3]))
+                if self.indexIDs[i] in self.previous:
+                    previous_box = self.previous[self.indexIDs[i]]
+                    (x2, y2) = (int(previous_box[0]), int(previous_box[1]))
+                    (w2, h2) = (int(previous_box[2]), int(previous_box[3]))
+                    p1 = (int(x2 + (w2 - x2) / 2), int(y2 + (h2 - y2) / 2))
+                    p0 = (int(x + (w - x) / 2), int(y + (h - y) / 2))
+                    for j in range(len(roi)):
+                        if self._intersect(p0, p1, roi[j][0], roi[j][1]):
+                            self.count[j] += 1
+                            del self.previous[self.indexIDs[i]]
+                            # del self.memory[self.indexIDs[i]]
+                i += 1
+
+    def get_count(self):
+        return self.count
 
 
 class ReverseVehicle:

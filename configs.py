@@ -9,8 +9,16 @@ idx_list = [class_to_idx[cls] for cls in ["Car", "Bus", "Truck", "Pedestrian"]]
 class METAINFO:
 
     engine2d_ckpt = "/home/chenzhen/dev-file/deploy-file/TensorRT-8.6.0.12/bin/yolox.engine"
-    video_reader = "/home/chenzhen/data/video/hangzhou.mp4"
+    video_reader = "/home/chenzhen/data/video/2022-11-16-07-18-32_sensor_smgs_camera.mp4"
 
+class Vehicle_line_head:
+   p1=[520,360]
+   p2=[650,340]
+   p3=[820,320]
+   p4=[1000,300]
+   p5=[1150,286]
+   p6=[1310,280]
+   list=[p1,p2,p3,p4,p5,p6]
 
 class COLORS:
 
@@ -40,6 +48,8 @@ class PositionObject:
 
 
 class MESSAGE:
+
+    publishTime = 5
 
     application_state = {
         "name": "message_detect",
@@ -153,7 +163,23 @@ class Vehicle_sort_list:
         [[1217, 242], [1335, 244]]
 
     ]
+class Vehicle_line_head:
+   p1=[520,360]
+   p2=[650,340]
+   p3=[820,320]
+   p4=[1000,300]
+   p5=[1150,286]
+   p6=[1310,280]
+   list=[p1,p2,p3,p4,p5,p6]
 
+class Vehicle_area_list:
+  list_pts_1 = [[482, 366], [257,588], [5, 933], [2, 1073], [95, 1076], [315, 706],[528, 437], [580, 352]]
+  list_pts_2 = [[581, 346], [740, 332], [537, 702], [373, 1080], [96, 1072], [323, 697], [513, 458]]
+  list_pts_3 = [[747, 330], [539, 716], [383, 1072], [756, 1075], [843, 604], [904, 316]]
+  list_pts_4 = [[904, 316], [822, 746], [762, 1072], [1217, 1072], [1134, 609], [1060, 294]]
+  list_pts_6 = [[1220, 281], [1456, 667], [1664, 1078], [1872, 1073], [1875, 906], [1749, 703],[1508,432], [1355, 259]]
+  list_pts_5 = [[1067, 294], [1160, 708], [1228, 1070], [1654, 1072], [1445, 638], [1223, 291]]
+  list = [list_pts_1,list_pts_2,list_pts_3,list_pts_4,list_pts_5,list_pts_6]
 
 class danger_area:
     roi_1 = [[223, 128], [223, 299], [447, 299], [447, 128]]
@@ -162,10 +188,12 @@ class danger_area:
     roi = [roi_1, roi_2, roi_3]
 
 
-class person_sort_list:
-    list = [
-        [[925, 0], [1080, 925]]
+class person_sort_list:# 最多4条同时存在
+  list = [
+      [[1248, 175], [1374,269]],
+      [[300,725],  [751,726]]
     ]
+
 
 
 class ReverseDriving:

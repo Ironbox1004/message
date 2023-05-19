@@ -2,23 +2,28 @@
 import datetime
 import threading
 import time
+from threading import Timer
+from tracker.byte_tracker import BYTETracker
 import json
-from main import logger_congestion, logger_reverse_driving
-import rospy
-from event_detection_topic.msg import Message
+# from main import logger_congestion, logger_reverse_driving
+# import rospy
+# from event_detection_topic.msg import Message
 from configs import *
 from message_detect import *
+from custom_util import  *
 
+detect = Detect(METAINFO.engine2d_ckpt)
+Tracker = BYTETracker()
 
 class MessageHandler:
     def __init__(self):
         self.events_list = []
         self.lock = threading.Lock()
 
-        rospy.init_node('event_message', anonymous=True)
-        rospy.Subscriber("2d_detection", Message, self.callback_detection)
-        rospy.Subscriber("perception_fusion", Message, self.callback_fusion)
-        self.event_pub = rospy.Publisher('event_topic', Message, queue_size=10)
+        # rospy.init_node('event_message', anonymous=True)
+        # rospy.Subscriber("2d_detection", Message, self.callback_detection)
+        # rospy.Subscriber("perception_fusion", Message, self.callback_fusion)
+        # self.event_pub = rospy.Publisher('event_topic', Message, queue_size=10)
 
         self.data_message_msg = DataMessage()
         # 给运维模块发送的消息计数，报文序列号，范围是0x0001~0xFFFF
@@ -30,20 +35,108 @@ class MessageHandler:
 
         self.lanes_num = LaneInfo.laneNums
         # 逆行检测对象字典
-        self.rd_checkers = {lane_id: ReverseDrivingDetector(
-            lane_angle) for lane_id, lane_angle in zip(LaneInfo.laneIdList, LaneInfo.laneAngles)}
+        # self.rd_checkers = {lane_id: ReverseDrivingDetector(
+        #     lane_angle) for lane_id, lane_angle in zip(LaneInfo.laneIdList, LaneInfo.laneAngles)}
+        #
+        # # 拥堵检测对象字典 同时开启车辆通过总耗时计算线程
+        # self.cg_checkers = {lane_id: CongestionDetector()
+        #                     for lane_id in LaneInfo.laneIdList}
+        # for cg_checker in self.cg_checkers.values():
+        #     thread = threading.Thread(target=cg_checker.calTotalTime)
+        #     thread.start()
+    def getTrackResults(self,bboxes, scores, labels):
+        """
+        获取跟踪结果
+        """
+        save_label_mask = torch.isin(labels.cpu(), torch.tensor(idx_list))
+        bboxes, scores, labels = bboxes[save_label_mask], scores[save_label_mask], labels[save_label_mask]
+        n_xyxycs = torch.cat((bboxes, labels[:, None], scores[:, None]), dim=-1)
+        n_xyxycs = Tracker.update(n_xyxycs.cpu())
+        return n_xyxycs
 
-        # 拥堵检测对象字典 同时开启车辆通过总耗时计算线程
-        self.cg_checkers = {lane_id: CongestionDetector()
-                            for lane_id in LaneInfo.laneIdList}
-        for cg_checker in self.cg_checkers.values():
-            thread = threading.Thread(target=cg_checker.calTotalTime)
-            thread.start()
+    def vs_handler(self,n_xyxycs):
+        '''
+        车流量统计
+        '''
+        vehicle_sort_count = SortCount()
+        vehicle_sort_count.sortcount(n_xyxycs, Vehicle_sort_list.list)
+        up_count, down_count = vehicle_sort_count.getSortCountResult()
+        print(up_count, down_count)
+
+
+    def ps_handler(self, n_xyxycs):
+        '''
+        人流量统计
+        '''
+        people_sort = PeSortCount()
+        people_sort_count = people_sort.pesortcount(n_xyxycs, person_sort_list.list)
+        print(people_sort_count)
+            # if current_timestamp - last_timestamp > MESSAGE.publishTime:
+            #     print(people_sort_count)
+                # 发布消息
+                # eventData = event_data()
+                # eventData.event_id = self.event_count % 65536
+                # self.event_count += 1
+                # eventData.event_type = 904
+    def ad_handler(self, n_xyxycs):
+        '''
+       危险区域统计
+        '''
+        regional_sort = RegionalJudgmentSort()
+        regional_sort.regional_judgment_sort(n_xyxycs, danger_area.roi)
+        people_sorts = regional_sort.getPersonResult()
+        if len(people_sorts['bbox'])>0:
+            print(people_sorts)
+            # eventData = event_data()
+            # eventData.event_id = self.event_count % 65536
+            # self.event_count += 1
+            # # 车辆逆行 405
+            # eventData.event_type = 405
+            # # 行人ID,经度,纬度,参与ID
+            # event_des = people_sorts["track_id"]
+            # eventData.description = '{' + str(event_des) + '}'
+            # eventData.event_pos.lat = 0
+            # eventData.event_pos.lon = 0
+            # eventData.event_pos.ele = 0
+            # eventData.event_obj_id = 3
+            # eventData.event_source = 5
+            # with self.lock:
+            #     self.events_list.append(eventData.__dict__)
+    def nl_handler(self, n_xyxycs):
+        '''
+        车辆排队数量，排队长度统计
+        '''
+        regional_sort = RegionalJudgmentSort()
+        regional_sort.regional_judgment_length(n_xyxycs, Vehicle_area_list.list)
+        vehicle_sorts = regional_sort.getVehicleResult()
+        if vehicle_sorts is not None:
+            print(vehicle_sorts)
+            # eventData = event_data()
+            # eventData.event_id = self.event_count % 65536
+            # self.event_count += 1
+            # # 车辆逆行 405
+            # eventData.event_type = 405
+            # # 行人ID,经度,纬度,参与ID
+            # event_des = vehicle_sorts["track_id"]
+            # eventData.description = '{' + str(event_des) + '}'
+            # eventData.event_pos.lat = 0
+            # eventData.event_pos.lon = 0
+            # eventData.event_pos.ele = 0
+            # eventData.event_obj_id = 3
+            # eventData.event_source = 5
+            # with self.lock:
+            #     self.events_list.append(eventData.__dict__)
 
     def callback_detection(self, data):
         # some logic to process the 2D detection data
-        with self.lock:
-            self.events_list.append(event_data())
+        bboxes, scores, labels = data.bboxes, data.scores, data.labels
+        n_xyxycs = self.getTrackResults(bboxes, scores, labels)
+
+        if n_xyxycs.shape[0] > 0:
+            self.vs_handler(n_xyxycs)
+            self.ps_handler(n_xyxycs)
+            self.ad_handler(n_xyxycs)
+            self.nl_handler(n_xyxycs)
 
     def rd_handler(self, lane_id, vehicle_info):
         """
