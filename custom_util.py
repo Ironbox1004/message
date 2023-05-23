@@ -188,6 +188,54 @@ def draw_poly_area_dangerous(img,area_poly):
     area_poly = np.array(area_poly, np.int32)
     cv2.polylines(img, [area_poly], isClosed=True, color=(0, 0, 255), thickness=3, lineType=cv2.LINE_AA)
 
+def is_poi_in_poly(pt, poly):
+    """
+    判断点是否在多边形内部的 pnpoly 算法
+    :param pt: 点坐标 [x,y]
+    :param poly: 点多边形坐标 [[x1,y1],[x2,y2],...]
+    :return: 点是否在多边形之内
+    """
+    nvert = len(poly)
+    vertx = []
+    verty = []
+    testx = pt[0]
+    testy = pt[1]
+    for item in poly:
+        vertx.append(item[0])
+        verty.append(item[1])
+    j = nvert - 1
+    res = False
+    for i in range(nvert):
+        if (verty[j] - verty[i]) == 0:
+            j = i
+            continue
+        x = (vertx[j] - vertx[i]) * (testy - verty[i]) / (verty[j] - verty[i]) + vertx[i]
+        if ((verty[i] > testy) != (verty[j] > testy)) and (testx < x):
+            res = not res
+        j = i
+    return res
+
+def in_poly_area_dangerous(xyxy,area_poly):
+    """
+    检测人体是否在多边形危险区域内
+    :param xyxy: 人体框的坐标
+    :param img_name: 检测的图片标号，用这个来对应图片的危险区域信息
+    :return: True -> 在危险区域内，False -> 不在危险区域内
+    """
+    # print(area_poly)
+    if not area_poly:  # 为空
+        return False
+    # 求物体框的中点
+    object_x1 = int(xyxy[0])
+    object_y1 = int(xyxy[1])
+    object_x2 = int(xyxy[2])
+    object_y2 = int(xyxy[3])
+    object_w = object_x2 - object_x1
+    object_h = object_y2 - object_y1
+    object_cx = object_x1 + (object_w / 2)
+    object_cy = object_y1 + (object_h / 2)
+    return is_poi_in_poly([object_cx, object_cy], area_poly)
+
 def plot_one_box(x, img, color):
     # Plots one bounding box on image img
     tl = round(0.002 * (img.shape[0] + img.shape[1]) / 2) + 1  # line/font thickness
@@ -195,7 +243,11 @@ def plot_one_box(x, img, color):
     cv2.rectangle(img, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
     return img
 
+def ccw(A, B, C):
+    return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
 
+def intersect(A, B, C, D):
+    return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
 
 
 if __name__ == '__main__':
