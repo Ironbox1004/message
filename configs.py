@@ -19,6 +19,22 @@ class COLORS:
     red = [0, 0, 255]
     green = [0, 255, 0]
 
+class ReverseDriving:
+    COUNT = 3
+    IS_ROAD_DIR = True
+    ROAD_DIR = 180
+    SCOPE = 30.0
+    REMOVE_TIME = 60
+    VECTOR_SIZE = 100
+    SPEED_THRESHOLD = 5
+    
+class Congestion:
+    ROAD_LENGTH = 15  # meters
+    DEPARTURE_TIME = 5  # seconds
+    TIME_INTERVAL = 15  # seconds
+    FREE_VELOCITY = 50  # km/h
+    CAL_INTERVAL = 10  # ms cal vector
+
 class Vehicle_sort_list: # 最多8条同时存在
 
     # list = [
@@ -58,8 +74,6 @@ class person_sort_list:
       [[800,352],[700,668]],
       [[960,0],[954,150]]
           ]
-
-
 class Vehicle_line_head:
    p1=[520,360]
    p2=[650,340]
@@ -68,7 +82,6 @@ class Vehicle_line_head:
    p5=[1150,286]
    p6=[1310,280]
    list=[p1,p2,p3,p4,p5,p6]
-
 
 class Vehicle_area_list:
   list_pts_1 = [[482, 366], [257,588], [5, 933], [2, 1073], [95, 1076], [315, 706],[528, 437], [580, 352]]
@@ -79,5 +92,122 @@ class Vehicle_area_list:
   list_pts_5 = [[1067, 294], [1160, 708], [1228, 1070], [1654, 1072], [1445, 638], [1223, 291]]
   list = [list_pts_1,list_pts_2,list_pts_3,list_pts_4,list_pts_5,list_pts_6]
 
+class MESSAGE:
 
+    application_state = {
+        "name": "message_detect",
+        "version": "1",
+        "publishDate": None,
+        "installType": 0x02,
+        "installLocation": "/home/../ros/catkin_ws/src/..",
+        "logLocation": "/home/../ros/catkin_ws/src/../log/",
+        "status": 0x01,
+        "description": "****test message****"
+    }
+
+    PositionObject = {
+        "lat": 0,
+        "lon": 0,
+        "ele": 0
+    }
+    # type1 业务消息
+    data = {
+        "type": 1,
+        "ver": '01',
+        "msg_cnt": 1,
+        "min_of_year": None,
+        "second": None,
+        "fus_dev_id": "1",
+        "ref_pos": PositionObject,
+        "scene_type": 0,
+        "objects_list": None,
+        "events_list": [],
+          "detected_region": None,
+        "obstacle_list": None
+    }
+    application_data = {
+        "type": 0x01,
+        "codec": 0x02,
+        "data": data
+    }
+    event_data = {
+        "event_id": 0,
+        "event_type": 1,
+        "description": "None",
+        "event_pos": None,
+        "event_obj_id": None,
+        "event_radius": None,
+        "priority": None,
+        "ref_path_list": None,
+        "ref_link_list": None,
+        "event_source": 5,
+        "event_confid": None,
+        "time_details": None
+    }
+    objects_list = {
+        "object_id": None,
+        "object_type": None,
+        "data_source": 3,
+        "object_pos": None,
+        "pos_confid": None,
+        "speed": None,
+        "heading": None,
+        "speed_confid": None,
+        "heading_confid": None,
+        "acceleration": None,
+        "object_size": None,
+        "vehicle_type": None,
+        "lane_id": None,
+        "plate_num": None,
+        "plate_type": None,
+        "plate_color": None,
+        "vehicle_color": None,
+        "obj_size_confid": None,
+        "object_type_ext": None,
+        "object_type_ext_confid": None,
+        "acceleration_confid": None,
+        "status_duration": None,
+        "path_history": None,
+        "path_prediction": None,
+        "tracking": None,
+        "polygon": None
+    }
+
+
+class DataMessage:
+    sof = 0x5A
+    version = 0x01
+    appId = 0x01
+    type = 0x04
+    codec = 0x01
+    sequence = 0x0001
+    timestamp = None
+    length = 100
+    payload = None
+    crc = 0xFFFF
+
+class PositionObject:
+    lat = 0
+    lon = 0
+    ele = 0
+
+class event_data:
+    event_id = 0
+    event_type = 1
+    description = "None"
+    event_pos = PositionObject()
+    event_obj_id = None
+    event_radius = None
+    priority = None
+    ref_path_list = None
+    ref_link_list = None
+    event_source = 5
+    event_confid = None
+    time_details = None
+
+
+class LaneInfo:
+    laneNums = 4
+    laneIdList = [2, 1, 5, 7]
+    laneAngles = [90, 180, 160, 70]
 
