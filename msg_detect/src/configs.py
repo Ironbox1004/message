@@ -186,6 +186,10 @@ logger_reverse_driving = LogManager('ReverseDrivingDetector').get_logger_and_add
 logger_congestion = LogManager('CongestionDetector').get_logger_and_add_handlers(10,
                                                                         log_path=METAINFO.logLocation,
                                                                         log_filename='Congestion.log')
+logger_vehicles = LogManager('Vehicles').get_logger_and_add_handlers(10,
+                                                                    log_path=METAINFO.logLocation,
+                                                                    log_filename='vehicles.log')
+
 
 logger_state = LogManager('MsgState').get_logger_and_add_handlers(10,
                                                                     log_path=METAINFO.logLocation,
