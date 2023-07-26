@@ -4,7 +4,7 @@ from nb_log import LogManager
 class METAINFO:
     installLocation = ""
     logLocation = "/home/chenzhen/ros_work/catkin_ws/log"
-    description = "****test message****"
+    App_description = "*Application status information reporting*"
 
 class ReverseDriving:
     COUNT = 3
@@ -60,6 +60,13 @@ class MESSAGE:
         "status": 0x01,
         "description": "****test message****"
     }
+    report_data = {
+        "type": None,
+        "codec": 0x02,
+        "data": [],
+        "timestamp": None
+    }
+
 
     PositionObject = {
         "lat": 0,
@@ -164,6 +171,9 @@ class event_data:
     event_confid = None
     time_details = None
 
+class report_data:
+    queueLength = []
+    # timestamp = None
 
 class LaneInfo:
     laneNums = 4
