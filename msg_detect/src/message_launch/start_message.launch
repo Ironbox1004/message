@@ -1,3 +1,0 @@
-<launch>
-	<node name="message_msgs" pkg="msg_detect" type="message_handler.py" output="screen"/>      
-</launch>

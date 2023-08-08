@@ -64,7 +64,7 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 add_message_files(FILES
 	Message.msg
-	
+	Datarepo.msg
 		)
 generate_messages(DEPENDENCIES std_msgs)
 ## Generate actions in the 'action' folder

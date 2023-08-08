@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(msg_detect)
+project(camera_msgs)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -55,7 +55,14 @@ find_package(catkin REQUIRED COMPONENTS
 #   Message1.msg
 #   Message2.msg
 # )
-
+add_message_files(FILES
+	results.msg
+        singleCameraObs.msg
+        OBSPoint.msg
+        OBSBox.msg
+        OBSAttributes.msg
+		)
+generate_messages(DEPENDENCIES std_msgs)
 ## Generate services in the 'srv' folder
 # add_service_files(
 #   FILES
@@ -108,7 +115,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 CATKIN_DEPENDS geometry_msgs roscpp rospy std_msgs message_runtime
 #  INCLUDE_DIRS include
-#  LIBRARIES msg_detect
+#  LIBRARIES xiangji_msgs
 #  CATKIN_DEPENDS roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
@@ -126,7 +133,7 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/msg_detect.cpp
+#   src/${PROJECT_NAME}/xiangji_msgs.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -137,7 +144,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/msg_detect_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/xiangji_msgs_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -173,12 +180,7 @@ include_directories(
 # install(TARGETS ${PROJECT_NAME}_node
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 # )
-catkin_install_python(PROGRAMS
-   src/message_handler.py
-#   src/message_detect_run.py
-   
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-    )
+
 ## Mark libraries for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_libraries.html
 # install(TARGETS ${PROJECT_NAME}
@@ -206,7 +208,7 @@ catkin_install_python(PROGRAMS
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_msg_detect.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_xiangji_msgs.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

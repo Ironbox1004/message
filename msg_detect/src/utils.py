@@ -7,10 +7,10 @@ from enum import Enum
 from typing import Dict
 import threading
 
+
 def merge_list(*args,
                fill_value=None
-    ):
-
+               ):
     max_length = max([len(lst)
                       for lst in args])
     result = []
@@ -25,7 +25,7 @@ def merge_list(*args,
 
 
 def ros2bbox_2d(ros_result
-    ):
+                ):
     top_lefts_x, top_lefts_y = [], []
     bottom_rights_x, bottom_rights_y = [], []
     track_ids = []
@@ -34,7 +34,6 @@ def ros2bbox_2d(ros_result
     for obs in ros_result.obs:
 
         for bbox_result in obs.obs_box:
-
             top_lefts_x.append(int(bbox_result.top_left.x))
             top_lefts_y.append(int(bbox_result.top_left.y))
             bottom_rights_x.append(int(bbox_result.bottom_right.x))
@@ -53,14 +52,12 @@ def ros2bbox_2d(ros_result
 
 
 def ros2bbox_3d(ros_result
-):
-
+                ):
     road_ids = []
     points_x = []
     points_y = []
 
     for result in ros_result.result3D:
-
         result.road_id = int(result.road_id) if result.road_id != '' else int(-1)
 
         road_ids.append(result.road_id)
@@ -89,7 +86,7 @@ class RegionalJudgmentSort:
     def _is_poi_in_poly(self,
                         pt,
                         poly
-        ):
+                        ):
         """
         judge whether the point is in the polygon
         :param pt: point [x,y]
@@ -119,7 +116,7 @@ class RegionalJudgmentSort:
     def _in_poly_area_dangerous(self,
                                 xyxy,
                                 area_poly
-        ):
+                                ):
         """
         judge whether the object is in the dangerous area
         :param xyxy: bbox of the object
@@ -140,14 +137,14 @@ class RegionalJudgmentSort:
         object_cy = object_y1 + (object_h / 2)
 
         return self._is_poi_in_poly(
-                                    [object_cx, object_cy],
-                                    area_poly
+            [object_cx, object_cy],
+            area_poly
         )
 
     def _euclidean_distance(self,
                             point1: int,
                             point2: int
-        ):
+                            ):
 
         x1, y1 = point1
         x2, y2 = point2
@@ -157,30 +154,29 @@ class RegionalJudgmentSort:
     def PersonJudgment(self,
                        sort_results: list,
                        roi: list
-        ):
+                       ):
         """
         :param sort_results: sort results
         :param roi: dangerous area
         :return: bbox and track_id in dangerous area
         """
-        if len(sort_results) > 0:
-            for track in sort_results:
-                bbox = track[:4]
-                label = track[-1]
-                track_id = track[4]
+        for track in sort_results:
+            bbox = track[:4]
+            label = track[-1]
+            track_id = track[4]
 
-                if label == 3:
-                    for i in range(len(roi)):
+            if label == 3:
+                for i in range(len(roi)):
 
-                        if self._in_poly_area_dangerous(bbox,
-                                                        roi[i]) == True:
-                            self.bbox.append(bbox)
+                    if self._in_poly_area_dangerous(bbox,
+                                                    roi[i]) == True:
+                        self.bbox.append(bbox)
 
-                            self.track_id.append(track_id)
-            self.in_bbox = {
-                "bbox": self.bbox,
-                "track_id": self.track_id
-            }
+                        self.track_id.append(track_id)
+        self.in_bbox = {
+            "bbox": self.bbox,
+            "track_id": self.track_id
+        }
 
     def VehicleJudgment(self,
                         lists):
@@ -369,7 +365,7 @@ class PeSortCount:
                 (x, y) = (int(box[0]), int(box[1]))
                 (w, h) = (int(box[2]), int(box[3]))
 
-                if self.indexIDs[i] in self.previous and label == 3:
+                if self.indexIDs[i] != -1 and self.indexIDs[i] in self.previous and label == 3:
                     previous_box = self.previous[self.indexIDs[i]]
                     (x2, y2) = (int(previous_box[0]), int(previous_box[1]))
                     (w2, h2) = (int(previous_box[2]), int(previous_box[3]))
@@ -384,7 +380,6 @@ class PeSortCount:
 
     def getPeSortCountResult(self):
         return self.count
-
 
 # class ReverseVehicle:
 #     def __init__(self,

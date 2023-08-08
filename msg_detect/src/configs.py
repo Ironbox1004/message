@@ -1,10 +1,15 @@
 from nb_log import LogManager
+from pathlib import Path
 
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]
 
 class METAINFO:
-    installLocation = ""
-    logLocation = "/home/chenzhen/ros_work/catkin_ws/log"
+    installLocation = ROOT
+    publishTime = 50
+    logLocation = ROOT / 'msg_log'
     App_description = "*Application status information reporting*"
+
 
 class ReverseDriving:
     COUNT = 3
@@ -34,6 +39,7 @@ class VehicleSortList:  # 最多8条同时存在
         [[1067, 309], [1244, 310]],
         [[1217, 242], [1335, 244]]
     ]
+
 
 class PersonDangerArea:
     roi_1 = [[1508, 99], [1394, 105], [1572, 293], [1848, 267], [1856, 133]]
@@ -66,7 +72,6 @@ class MESSAGE:
         "data": [],
         "timestamp": None
     }
-
 
     PositionObject = {
         "lat": 0,
@@ -171,9 +176,11 @@ class event_data:
     event_confid = None
     time_details = None
 
+
 class report_data:
     queueLength = []
     # timestamp = None
+
 
 class LaneInfo:
     laneNums = 4
@@ -181,26 +188,36 @@ class LaneInfo:
     laneAngles = [90, 180, 160, 70]
 
 
-logger_danger_area_detect = LogManager('PersonDangerArea').get_logger_and_add_handlers(10,
-                                                                        log_path=METAINFO.logLocation,
-                                                                        log_filename='danger_area_detect.log')
+logger_danger_area_detect = \
+    LogManager('PersonDangerArea').get_logger_and_add_handlers(10,
+                                                               log_path=METAINFO.logLocation,
+                                                               log_filename='danger_area_detect.log')
 
-logger_vehicle_sort = LogManager('vehicle_sort').get_logger_and_add_handlers(10,
-                                                                        log_path=METAINFO.logLocation,
-                                                                        log_filename='vehicle_sort.log')
-
-logger_reverse_driving = LogManager('ReverseDrivingDetector').get_logger_and_add_handlers(10,
-                                                                        log_path=METAINFO.logLocation,
-                                                                        log_filename='reverse_driving.log')
-
-logger_congestion = LogManager('CongestionDetector').get_logger_and_add_handlers(10,
-                                                                        log_path=METAINFO.logLocation,
-                                                                        log_filename='Congestion.log')
-logger_vehicles = LogManager('Vehicles').get_logger_and_add_handlers(10,
-                                                                    log_path=METAINFO.logLocation,
-                                                                    log_filename='vehicles.log')
+logger_vehicle_sort = \
+    LogManager('vehicle_sort').get_logger_and_add_handlers(10,
+                                                           log_path=METAINFO.logLocation,
+                                                           log_filename='vehicle_sort.log')
+logger_person_sort = \
+    LogManager('person_sort').get_logger_and_add_handlers(10,
+                                                           log_path=METAINFO.logLocation,
+                                                           log_filename='person_sort.log')
 
 
-logger_state = LogManager('MsgState').get_logger_and_add_handlers(10,
-                                                                    log_path=METAINFO.logLocation,
-                                                                    log_filename='msg_state.log')
+logger_reverse_driving = \
+    LogManager('ReverseDrivingDetector').get_logger_and_add_handlers(10,
+                                                                     log_path=METAINFO.logLocation,
+                                                                     log_filename='reverse_driving.log')
+
+logger_congestion = \
+    LogManager('CongestionDetector').get_logger_and_add_handlers(10,
+                                                                 log_path=METAINFO.logLocation,
+                                                                 log_filename='Congestion.log')
+logger_vehicles = \
+    LogManager('Vehicles').get_logger_and_add_handlers(10,
+                                                       log_path=METAINFO.logLocation,
+                                                       log_filename='vehicles.log')
+
+logger_state = \
+    LogManager('MsgState').get_logger_and_add_handlers(10,
+                                                       log_path=METAINFO.logLocation,
+                                                       log_filename='msg_state.log')

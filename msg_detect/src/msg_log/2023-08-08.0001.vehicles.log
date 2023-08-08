@@ -1,0 +1,3 @@
+2023-08-08 14:15:34 - Vehicles - "/home/chenzhen/ros_work/catkin_ws/src/msg_detect/src/message_handler.py:177" - MessageHandler.nl_handler - INFO - 当前:4车道的车辆数量为:2,长度为:4.55
+2023-08-08 14:15:34 - Vehicles - "/home/chenzhen/ros_work/catkin_ws/src/msg_detect/src/message_handler.py:177" - MessageHandler.nl_handler - INFO - 当前:4车道的车辆数量为:2,长度为:2.77
+2023-08-08 14:15:34 - Vehicles - "/home/chenzhen/ros_work/catkin_ws/src/msg_detect/src/message_handler.py:177" - MessageHandler.nl_handler - INFO - 当前:3车道的车辆数量为:2,长度为:2.1
