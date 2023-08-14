@@ -10,7 +10,7 @@ from threading import Timer
 import json
 import rospy
 from utils import *
-from message_msgs.msg import Message, Datarepo
+from message_msgs.msg import Message
 from camera_msgs.msg import results as xj_results
 from lidar_msgs.msg import results as lidar_results
 from configs import *
@@ -29,9 +29,13 @@ class MessageHandler:
         self.events_lock = threading.Lock()
         self.report_lock = threading.Lock()
 
-        self.report_list_withtime = [[], []]
-        self.report_lock_withtime = threading.Lock()
+        self.report_list_vehicle = [[], []]
+        self.report_lock_vehicle = threading.Lock()
+        self.old_vehicle_data = [0,0,0,0,0,0,0,0]
 
+        self.report_list_person  = [[], []]
+        self.report_lock_person = threading.Lock()
+        self.old_person_data = [0, 0, 0, 0]
 
         rospy.init_node('event_message', anonymous=True)
 
@@ -55,6 +59,7 @@ class MessageHandler:
 
         self.send_time1 = rospy.Time.now() + rospy.Duration(1.0)
         self.send_time2 = rospy.Time.now() + rospy.Duration(1.0)
+        self.send_time3 = rospy.Time.now() + rospy.Duration(1.0)
 
         self.crc16 = crcmod.predefined.mkPredefinedCrcFun('crc16')
         # 给运维模块发送的消息计数，报文序列号，范围是0x0001~0xFFFF
@@ -96,13 +101,13 @@ class MessageHandler:
         #         results_list = [x - y for x, y in zip(results_list_2, results_list)]
         #         self.vehicle_last_timestamp = current_timestamp
 
-        results = {index: value for index, value in enumerate(results_list)}
-        reporData.queueLength.append(results)
-        logger_vehicle_sort.info("vehicle_counts:{}".
+        # results = {index: value for index, value in enumerate(results_list)}
+        reporData.queueLength.append(results_list)
+        logger_vehicle_sort.info("当前车流量为:{}".
                                  format(results_list))
-        with self.report_lock_withtime:
-            self.report_list_withtime[0] = ["0x05"]
-            self.report_list_withtime[1] = reporData.queueLength
+        with self.report_lock_vehicle:
+            self.report_list_vehicle[0] = ["0x05"]
+            self.report_list_vehicle[1] = reporData.queueLength
 
     def ps_handler(self, results_2d):
         '''
@@ -113,7 +118,7 @@ class MessageHandler:
         people_sort = PeSortCount()
         people_sort.peSortCount(results_2d, PersonSortList.list)
         people_sort_count = people_sort.getPeSortCountResult()
-        results = {index: value for index, value in enumerate(people_sort_count)}
+        # results = {index: value for index, value in enumerate(people_sort_count)}
         # 自定义发送事件设置，需测试功能
         # current_timestamp = time.time()
         # if self.is_set_PublishTime:
@@ -123,12 +128,12 @@ class MessageHandler:
         #         results = {index: value - people_sort_count[index] for index, value in enumerate(results)}
         #         self.person_last_timestamp = current_timestamp
 
-        reporData.queueLength.append(results)
-        logger_person_sort.info("person_counts:{}".
-                                format(results))
-        with self.report_lock_withtime:
-            self.report_list_withtime[0] = ["0x04"]
-            self.report_list_withtime[1] = reporData.queueLength
+        reporData.queueLength.append(people_sort_count)
+        logger_person_sort.info("当前人流量为:{}".
+                                format(people_sort_count))
+        with self.report_lock_person:
+            self.report_list_person[0] = ["0x04"]
+            self.report_list_person[1] = reporData.queueLength
 
     def ad_handler(self, results_2d):
         '''
@@ -138,7 +143,7 @@ class MessageHandler:
         regional_sort.PersonJudgment(results_2d, PersonDangerArea.roi)
         people_sorts = regional_sort.getPersonResult()
         if len(people_sorts['bbox']) > 0:
-            logger_danger_area_detect.info("Hazardous area detection results:{}".format(people_sorts))
+            logger_danger_area_detect.info("检测区域中出现行人:{}".format(people_sorts))
             eventData = event_data()
             eventData.event_id = self.event_count % 65536
             self.event_count += 1
@@ -155,7 +160,7 @@ class MessageHandler:
             with self.events_lock:
                 self.events_list.append(eventData.__dict__)
         else:
-            logger_danger_area_detect.info("Currently no detection results,detection area:{}"
+            logger_danger_area_detect.info("当前没有检测到行人闯入，检测区域为:{}"
                                            .format(PersonDangerArea.roi))
 
     def nl_handler(self, results_3d):
@@ -297,7 +302,7 @@ class MessageHandler:
         self.state_message_msg.crc = crc & 0xFFFF
 
         self.state_pub.publish(self.state_message_msg)
-        logger_state.info("The current status is normal")
+        logger_state.info("当前事件检测服务运行状态良好！")
         # self.state_pub_rate.sleep()
         # rospy.loginfo("Publsh state_message_msg[%d, %d, %d, %d, %d, %d, %s, %d, %s, %d ]",
         #               self.state_message_msg.sof, self.state_message_msg.version, self.state_message_msg.appId,
@@ -359,7 +364,7 @@ class MessageHandler:
             # self.event_pub_rate.sleep()
 
     def publish_report_data(self):
-        #发送不需设置发送时间的报文
+        # 发送不需设置发送时间的报文
         if len(self.report_list[1]) > 0:
             # print(self.report_list)
             report_data = MESSAGE.report_data
@@ -397,11 +402,9 @@ class MessageHandler:
 
             self.report_pub.publish(self.data_report_msg)
 
-
-    def publish_report_data_withtime(self):
-        #发送需设置发送时间的报文
-        if len(self.report_list_withtime[1]) > 0:
-            # print(self.report_list)
+    def publish_report_vehicle_data(self):
+        if len(self.report_list_vehicle[1]) > 0:
+        # print(self.report_list)
             report_data = MESSAGE.report_data
             now_python = datetime.now()
             minute_offset = now_python.minute  # 计算当前时间在当天中已经过去的分钟数，即分钟内的偏移量
@@ -411,13 +414,65 @@ class MessageHandler:
             # 将毫秒级时刻格式化为字符串
             ms_time_str = "{:03d}".format(ms_time)
 
-            with self.report_lock_withtime:
+            with self.report_lock_vehicle:
+                    # print(self.report_list)
+                self.report_count += 1
+                # print("old_data",self.old_vehicle_data)
+                report_data["type"] = int(self.report_list_vehicle[0][0], 16)
+                preveicle_results = [x - y for x, y in zip(self.report_list_vehicle[1][0], self.old_vehicle_data)]
+                report_data["data"] = {index: value for index, value in enumerate(preveicle_results)}
+
+                logger_vehicle_sort.info("当前车流量差值为:{}".
+                                             format(preveicle_results))
+
+                report_data["timestamp"] = ms_time_str
+                self.old_vehicle_data = self.report_list_vehicle[1][0]
+                self.report_list_vehicle = [[], []]
+
+            data_json_result = json.dumps(report_data)
+            data_json_result = bytes(data_json_result, encoding="utf8")
+            crc = self.crc16(data_json_result)
+
+                # 交通统计信息上报
+            self.data_report_msg.sof = 0x5A
+            self.data_report_msg.version = 0x01
+            self.data_report_msg.appId = 0x01
+            self.data_report_msg.type = 0x04
+            self.data_report_msg.codec = 0x01
+            self.data_report_msg.sequence = self.report_count % 0xFFFF
+            self.data_report_msg.timestamp = rospy.get_rostime().to_sec()
+            self.data_report_msg.length = len(data_json_result)
+            self.data_report_msg.payload = data_json_result
+            self.data_report_msg.crc = crc & 0xFFFF
+
+            self.report_pub_withtime.publish(self.data_report_msg)
+
+    def publish_report_person_data(self):
+        if len(self.report_list_person[1]) > 0:
+        # print(self.report_list)
+            report_data = MESSAGE.report_data
+            now_python = datetime.now()
+            minute_offset = now_python.minute  # 计算当前时间在当天中已经过去的分钟数，即分钟内的偏移量
+            # 计算当前时间的毫秒数，并添加到分钟偏移量中得到毫秒级时刻
+            millisecond_offset = now_python.microsecond // 1000
+            ms_time = minute_offset * 60 * 1000 + millisecond_offset
+            # 将毫秒级时刻格式化为字符串
+            ms_time_str = "{:03d}".format(ms_time)
+
+            with self.report_lock_person:
                 # print(self.report_list)
                 self.report_count += 1
-                report_data["type"] = int(self.report_list_withtime[0][0], 16)
-                report_data["data"] = self.report_list_withtime[1]
+                # print("oldperson_data", self.old_person_data)
+                report_data["type"] = int(self.report_list_person[0][0], 16)
+                preperson_results = [x - y for x, y in zip(self.report_list_person[1][0], self.old_person_data)]
+                report_data["data"] = {index: value for index, value in enumerate(preperson_results)}
+
+                logger_person_sort.info("当前人流量差值为:{}".
+                                         format(preperson_results))
+
                 report_data["timestamp"] = ms_time_str
-                self.report_list_withtime = [[], []]
+                self.old_person_data = self.report_list_person[1][0]
+                self.report_list_person = [[], []]
 
             data_json_result = json.dumps(report_data)
             data_json_result = bytes(data_json_result, encoding="utf8")
@@ -437,6 +492,7 @@ class MessageHandler:
 
             self.report_pub_withtime.publish(self.data_report_msg)
 
+
     def run(self):
         while not rospy.is_shutdown():
             self.publish_events()
@@ -446,8 +502,11 @@ class MessageHandler:
                 self.publish_states()
                 self.send_time1 = rospy.Time.now() + rospy.Duration(120.0)  # 设置下一次发送时间
             if current_time >= self.send_time2:
-                self.publish_report_data_withtime()
-                self.send_time2 = rospy.Time.now() + rospy.Duration(60.0)
+                self.publish_report_vehicle_data()
+                self.send_time2 = rospy.Time.now() + rospy.Duration(10.0)
+            if current_time >= self.send_time3:
+                self.publish_report_person_data()
+                self.send_time3 = rospy.Time.now() + rospy.Duration(20.0)
             # rate = rospy.Rate(1)
             # rate.sleep()
             rospy.sleep(0.1)  # 控制循环的频率和响应时间
