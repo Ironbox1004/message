@@ -10,23 +10,28 @@ class METAINFO:
     logLocation = ROOT / 'msg_log'
     App_description = "*Application status information reporting*"
 
+# 车道信息，车道数，车道id，对应行驶角度
+class LaneInfo:
+    laneNums = 4
+    laneIdList = [2, 1, 5, 7]
+    laneAngles = [90, 180, 160, 70]
 
 class ReverseDriving:
-    COUNT = 3
+    COUNT = 3 # 当前id车辆逆行次数超过这个值时，并且满足下面的SPEED_THRESHOLD行驶速度，就会上报逆行事件
     IS_ROAD_DIR = True
-    ROAD_DIR = 180
-    SCOPE = 30.0
-    REMOVE_TIME = 60
+    # ROAD_DIR = 180
+    SCOPE = 30.0 # 判断逆行的角度范围，如果车辆航向角在道路指定范围的反向+-SCOPE范围内，即可认为是逆行方向
+    REMOVE_TIME = 60 # 当记录逆行车辆未达逆行检测次数，并后续时间内没有捕捉到车辆逆行，就将该id的逆行记录去掉
     VECTOR_SIZE = 100
     SPEED_THRESHOLD = 5
 
 
 class Congestion:
-    ROAD_LENGTH = 15  # meters
-    DEPARTURE_TIME = 5  # seconds
-    TIME_INTERVAL = 15  # seconds
-    FREE_VELOCITY = 50  # km/h
-    CAL_INTERVAL = 10  # ms cal vector
+    ROAD_LENGTH = 15  # meters  监控路段长度
+    DEPARTURE_TIME = 5  # seconds  目标指定时间未出现后，认为目标离开监控路段
+    TIME_INTERVAL = 15  # seconds  拥堵判断统计周期
+    FREE_VELOCITY = 50  # km/h  道路的自由流速度
+    CAL_INTERVAL = 10  # ms cal vector  定时计算总耗时的间隔
 
 
 class VehicleSortList:  # 最多8条同时存在
@@ -182,11 +187,16 @@ class report_data:
     # timestamp = None
 
 
-class LaneInfo:
-    laneNums = 4
-    laneIdList = [2, 1, 5, 7]
-    laneAngles = [90, 180, 160, 70]
 
+
+class Vehicle:
+     def __init__(self,track_id,lane_id,heading,speed,lon,lat) -> None:
+        self.track_id=track_id
+        self.lane_id=lane_id
+        self.heading=heading
+        self.speed=speed
+        self.lon=lon
+        self.lat=lat
 
 logger_danger_area_detect = \
     LogManager('PersonDangerArea').get_logger_and_add_handlers(10,

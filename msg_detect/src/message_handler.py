@@ -1,20 +1,20 @@
+import crcmod.predefined
+from configs import *
+from lidar_msgs.msg import results as lidar_results
+from camera_msgs.msg import results as xj_results
+from message_msgs.msg import Message
+from utils import *
+import rospy
+import json
+from threading import Timer
+import threading
+from datetime import datetime
 import sys
 from pathlib import Path
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]
 sys.path.append(str(ROOT))
-from datetime import datetime
-import threading
-from threading import Timer
-import json
-import rospy
-from utils import *
-from message_msgs.msg import Message
-from camera_msgs.msg import results as xj_results
-from lidar_msgs.msg import results as lidar_results
-from configs import *
-import crcmod.predefined
 
 
 class MessageHandler:
@@ -40,16 +40,20 @@ class MessageHandler:
         rospy.init_node('event_message', anonymous=True)
 
         # 结果消息初始化
-        rospy.Subscriber("/vision_result", xj_results, self.callback_2Ddetection)
-        rospy.Subscriber("/fusion/output/AlgVis", lidar_results, self.callback_3Ddetection)
+        rospy.Subscriber("/vision_result", xj_results,
+                         self.callback_2Ddetection)
+        rospy.Subscriber("/fusion/output/AlgVis",
+                         lidar_results, self.callback_3Ddetection)
 
         # 事件触发类消息上报，包含设备状态
         self.event_pub = rospy.Publisher('/event_topic', Message, queue_size=1)
         self.state_pub = rospy.Publisher('/event_topic', Message, queue_size=1)
 
         # 事件统计类消息上报
-        self.report_pub = rospy.Publisher('/report_topic', Message, queue_size=1)
-        self.report_pub_withtime = rospy.Publisher('/report_topic', Message, queue_size=1)
+        self.report_pub = rospy.Publisher(
+            '/report_topic', Message, queue_size=1)
+        self.report_pub_withtime = rospy.Publisher(
+            '/report_topic', Message, queue_size=1)
 
         # 事件触发类消息初始化
         self.state_message_msg = Message()
@@ -72,15 +76,15 @@ class MessageHandler:
         self.report_count = 0
         self.lanes_num = LaneInfo.laneNums
         # 逆行检测对象字典
-        # self.rd_checkers = {lane_id: ReverseDrivingDetector(
-        #     lane_angle) for lane_id, lane_angle in zip(LaneInfo.laneIdList, LaneInfo.laneAngles)}
-        #
-        # # 拥堵检测对象字典 同时开启车辆通过总耗时计算线程
-        # self.cg_checkers = {lane_id: CongestionDetector()
-        #                     for lane_id in LaneInfo.laneIdList}
-        # for cg_checker in self.cg_checkers.values():
-        #     thread = threading.Thread(target=cg_checker.calTotalTime)
-        #     thread.start()
+        self.rd_checkers = {lane_id: ReverseDrivingDetector(
+            lane_angle) for lane_id, lane_angle in zip(LaneInfo.laneIdList, LaneInfo.laneAngles)}
+
+        # 拥堵检测对象字典 同时开启车辆通过总耗时计算线程
+        self.cg_checkers = {lane_id: CongestionDetector()
+                            for lane_id in LaneInfo.laneIdList}
+        for cg_checker in self.cg_checkers.values():
+            thread = threading.Thread(target=cg_checker.calTotalTime)
+            thread.start()
 
     def vs_handler(self, n_xyxycs):
         '''
@@ -150,7 +154,7 @@ class MessageHandler:
             # 行人闯入 405
             eventData.event_type = 405
             # 行人ID,经度,纬度,参与ID
-            #TODO: 上报结果结构待定
+            # TODO: 上报结果结构待定
             event_des = people_sorts
             eventData.description = '{' + str(event_des) + '}'
             eventData.event_pos.lat = 0
@@ -181,7 +185,8 @@ class MessageHandler:
                 continue
             else:
                 logger_vehicles.info(
-                    "当前:{}车道的车辆数量为:{},长度为:{}".format(key1, max(value2), max(value1))
+                    "当前:{}车道的车辆数量为:{},长度为:{}".format(
+                        key1, max(value2), max(value1))
                 )
                 results = {
                     "lane_id": key1,
@@ -194,11 +199,88 @@ class MessageHandler:
             self.report_list[1] = reporData.queueLength
         # print(self.report_list)
 
+    def rd_handler(self, lane_id, vehicle_info):
+        """
+        逆行处理函数,收到对应id车道目标物数据后,传递给对应的逆行检测对象,
+        逆行逻辑触发时,将事件结果添加到eventList中
+        """
+        result = self.rd_checkers[lane_id].checkForReverseDriving(
+            vehicle_info.track_id, vehicle_info.heading, vehicle_info.speed)
+        logger_reverse_driving.info("rd_handler ")
+        if result == -1:
+            pass
+        else:
+            eventData = event_data()
+            eventData.event_id = self.event_count % 65536
+            self.event_count += 1
+            # 车辆逆行 904
+            eventData.event_type = 904
+            # 车辆ID,车道ID,经度,纬度,速度
+            event_des = [result, lane_id, 0, 0, vehicle_info.speed]
+            eventData.description = '{' + str(event_des)[1:-1] + '}'
+            eventData.event_pos.lat = 0
+            eventData.event_pos.lon = 0
+            eventData.event_pos.ele = 0
+            eventData.event_obj_id = result
+            eventData.event_source = 5
+            with self.lock:
+                self.events_list.append(eventData.__dict__)
+
+    def cg_handler(self, lane_id, vehicle_info):
+        """
+        拥堵处理函数，将收到的车辆数据传给对应的拥堵检测对象，根据计算所得拥堵结果
+        当拥堵程度大于流畅等级时，上报事件，同时将车辆计数和平均速度填充上报
+        """
+        # add obj
+        self.cg_checkers[lane_id].addObject(vehicle_info.track_id)
+        # logger.info(
+        #     "cg_handler recv laneid"+str(lane_id)+" obj_id "+str(vehicle_info.track_id))
+
+        result_speed = self.cg_checkers[lane_id].get_average_speed()
+        # logger.info(
+        #     "cg_handler recv laneid"+str(lane_id)+" obj_id average_speed "+str(result_speed))
+
+        # # cal cg_level
+        result = self.cg_checkers[lane_id].check_congestion_level()
+        # logger.info(
+        #     "cg_handler recv laneid"+str(lane_id)+" obj_id congestion_level"+str(result))
+
+        # # cal cg_level
+        result_time = self.cg_checkers[lane_id].getTotalTime()
+        # logger.info(
+        #     "cg_handler recv laneid"+str(lane_id)+" obj_id total_time "+str(result_time))
+
+        result_vc_count = self.cg_checkers[lane_id].getVehicleCounts()
+        logger_congestion.info(
+            "cg_handler recv laneid" +
+            str(lane_id)+" obj_id "+str(vehicle_info.track_id)
+            + "  average_speed "+str(result_speed) +
+            "  congestion_level"+str(result)
+            + "  total_time "+str(result_time)+"  VehicleCounts "+str(result_vc_count))
+        if result == CongestionLevel.LIGHT or result == CongestionLevel.MODERATE or result == CongestionLevel.SERIOUS:
+            logger_congestion.info("congest event 707!!!")
+            eventData = event_data()
+            eventData.event_id = self.event_count % 65536
+            self.event_count += 1
+            # 交通拥堵 707
+            eventData.event_type = 707
+            # 拥堵程度(1轻-2中-3重), 排队长度, 车道ID、平均速度, 总车流量(单位时间流过检测横截面的车辆数), 车间距, 时间占有率, 空间占有率
+            event_des = [result, 0, lane_id,
+                         result_speed, result_vc_count, 0, 0, 0]
+            eventData.description = '{' + str(event_des)[1:-1] + '}'
+            eventData.event_pos.lat = 0
+            eventData.event_pos.lon = 0
+            eventData.event_pos.ele = 0
+            eventData.event_obj_id = vehicle_info.track_id
+            eventData.event_source = 5
+            with self.lock:
+                self.events_list.append(eventData.__dict__)
+
     def callback_2Ddetection(self, results_2d):
         # some logic to process the 2D detection data
         new_results_2d = ros2bbox_2d(results_2d)
         if new_results_2d is not None:
-            #TODO: 是否需要实现线程池化
+            # TODO: 是否需要实现线程池化
             self.ps_handler(new_results_2d)
             self.vs_handler(new_results_2d)
             self.ad_handler(new_results_2d)
@@ -209,64 +291,19 @@ class MessageHandler:
         if new_results_3d is not None:
             self.nl_handler(new_results_3d)
 
-    #TODO: 后续3D检测结果上报实现
+        for obj in results_3d.result3D:
+            # 0汽车 1自行车 2行人 3公交车  4卡车八百 5工程车 6三轮车 7无人车 8障碍物 9无人骑行
+            if obj.cls == 0 or obj.cls == 3 or obj.cls == 4 or obj.cls == 5:
+                road_id = int(obj.road_id) if obj.road_id != '' else int(-1)
+                speed = math.sqrt(
+                    pow(obj.velocity[0], 2)+pow(obj.velocity[1], 2))
+                heading = obj.rotation*180/math.pi
+                ve = Vehicle(obj.track_id, 0, heading, speed,
+                             obj.longitude, obj.latitude)
+                self.cg_handler(road_id, ve)
+                self.rd_handler(road_id, ve)
 
-    # def rd_handler(self, lane_id, vehicle_info):
-    #     """
-    #     逆行处理函数，收到对应id车道目标物数据后，传递给对应的逆行检测对象，
-    #     逆行逻辑触发时，将事件结果添加到eventList中
-    #     """
-    #     result = self.rd_checkers[lane_id].checkForReverseDriving(
-    #         vehicle_info.id, vehicle_info.carDir, vehicle_info.speed)
-    #     if result == -1:
-    #         pass
-    #     else:
-    #         eventData = event_data()
-    #         eventData.event_id = self.event_count % 65536
-    #         self.event_count += 1
-    #         # 车辆逆行 904
-    #         eventData.event_type = 904
-    #         # 车辆ID,车道ID,经度,纬度,速度
-    #         event_des = [result, lane_id, 0, 0, vehicle_info.speed]
-    #         eventData.description = '{' + str(event_des)[1:-1] + '}'
-    #         eventData.event_pos.lat = 0
-    #         eventData.event_pos.lon = 0
-    #         eventData.event_pos.ele = 0
-    #         eventData.event_obj_id = result
-    #         eventData.event_source = 5
-    #         with self.lock:
-    #             self.events_list.append(eventData.__dict__)
-
-    # def cg_handler(self, lane_id, vehicle_info):
-    #     """
-    #     拥堵处理函数，将收到的车辆数据传给对应的拥堵检测对象，根据计算所得拥堵结果
-    #     当拥堵程度大于流畅等级时，上报事件，同时将车辆计数和平均速度填充上报
-    #     """
-    #     # add obj
-    #     self.cg_checkers[lane_id].addObject(vehicle_info.id)
-    #     logger_congestion.info(
-    #         "cg_handler recv "+str(lane_id)+" obj_id "+str(vehicle_info.id))
-    #     # cal cg_level
-    #     result = self.cg_checkers[lane_id].check_congestion_level()
-    #     result_speed = self.cg_checkers[lane_id].get_average_speed()
-    #     result_vc_count = self.cg_checkers[lane_id].getVehicleCounts()
-    #     if result == CongestionLevel.LIGHT or result == CongestionLevel.MODERATE or result == CongestionLevel.SERIOUS:
-    #         eventData = event_data()
-    #         eventData.event_id = self.event_count % 65536
-    #         self.event_count += 1
-    #         # 交通拥堵 707
-    #         eventData.event_type = 707
-    #         # 拥堵程度(1轻-2中-3重), 排队长度, 车道ID、平均速度, 总车流量(单位时间流过检测横截面的车辆数), 车间距, 时间占有率, 空间占有率
-    #         event_des = [result, 0, lane_id,
-    #                      result_speed, result_vc_count, 0, 0, 0]
-    #         eventData.description = '{' + str(event_des)[1:-1] + '}'
-    #         eventData.event_pos.lat = 0
-    #         eventData.event_pos.lon = 0
-    #         eventData.event_pos.ele = 0
-    #         eventData.event_obj_id = vehicle_info.id
-    #         eventData.event_source = 5
-    #         with self.lock:
-    #             self.events_list.append(eventData.__dict__)
+    # TODO: 后续3D检测结果上报实现
 
     # def callback_fusion(self, data):
     #     # parse ros fusion data
@@ -357,7 +394,8 @@ class MessageHandler:
             self.data_message_msg.appId = 0x01
             self.data_message_msg.type = 0x04
             self.data_message_msg.codec = 0x01
-            self.data_message_msg.sequence = (self.data_message_msg.sequence) & 0xFFFF
+            self.data_message_msg.sequence = (
+                self.data_message_msg.sequence) & 0xFFFF
             self.data_message_msg.sequence += 1
             self.data_message_msg.timestamp = rospy.get_rostime().to_sec()
             self.data_message_msg.length = len(data_json_result)
@@ -421,8 +459,10 @@ class MessageHandler:
             with self.report_lock_vehicle:
                 self.report_count += 1
                 report_data["type"] = int(self.report_list_vehicle[0][0], 16)
-                preveicle_results = [x - y for x, y in zip(self.report_list_vehicle[1][0], self.old_vehicle_data)]
-                report_data["data"] = {index: value for index, value in enumerate(preveicle_results)}
+                preveicle_results = [
+                    x - y for x, y in zip(self.report_list_vehicle[1][0], self.old_vehicle_data)]
+                report_data["data"] = {
+                    index: value for index, value in enumerate(preveicle_results)}
 
                 logger_vehicle_sort.info("当前车流量差值为:{}".
                                          format(preveicle_results))
@@ -466,8 +506,10 @@ class MessageHandler:
                 self.report_count += 1
                 # print("oldperson_data", self.old_person_data)
                 report_data["type"] = int(self.report_list_person[0][0], 16)
-                preperson_results = [x - y for x, y in zip(self.report_list_person[1][0], self.old_person_data)]
-                report_data["data"] = {index: value for index, value in enumerate(preperson_results)}
+                preperson_results = [
+                    x - y for x, y in zip(self.report_list_person[1][0], self.old_person_data)]
+                report_data["data"] = {
+                    index: value for index, value in enumerate(preperson_results)}
 
                 logger_person_sort.info("当前人流量差值为:{}".
                                         format(preperson_results))
@@ -500,13 +542,16 @@ class MessageHandler:
             current_time = rospy.Time.now()
             if current_time >= self.send_time1:
                 self.publish_states()
-                self.send_time1 = rospy.Time.now() + rospy.Duration(METAINFO.state_publishTime)  # 设置下一次发送时间
+                self.send_time1 = rospy.Time.now(
+                ) + rospy.Duration(METAINFO.state_publishTime)  # 设置下一次发送时间
             if current_time >= self.send_time2:
                 self.publish_report_vehicle_data()
-                self.send_time2 = rospy.Time.now() + rospy.Duration(METAINFO.statistics_publishTime)  # 设置下一次发送时间
+                self.send_time2 = rospy.Time.now(
+                ) + rospy.Duration(METAINFO.statistics_publishTime)  # 设置下一次发送时间
             if current_time >= self.send_time3:
                 self.publish_report_person_data()
-                self.send_time3 = rospy.Time.now() + rospy.Duration(METAINFO.statistics_publishTime)  # 设置下一次发送时间
+                self.send_time3 = rospy.Time.now(
+                ) + rospy.Duration(METAINFO.statistics_publishTime)  # 设置下一次发送时间
             # rate = rospy.Rate(1)
             # rate.sleep()
             rospy.sleep(0.1)  # 控制循环的频率和响应时间

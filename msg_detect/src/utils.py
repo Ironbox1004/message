@@ -3,7 +3,7 @@ import math
 from configs import *
 import time
 from enum import Enum
-# import datetime
+import datetime
 from typing import Dict
 import threading
 
@@ -58,7 +58,8 @@ def ros2bbox_3d(ros_result
     points_y = []
 
     for result in ros_result.result3D:
-        result.road_id = int(result.road_id) if result.road_id != '' else int(-1)
+        result.road_id = int(
+            result.road_id) if result.road_id != '' else int(-1)
 
         road_ids.append(result.road_id)
         points_x.append(result.center[0])
@@ -107,7 +108,8 @@ class RegionalJudgmentSort:
             if (verty[j] - verty[i]) == 0:
                 j = i
                 continue
-            x = (vertx[j] - vertx[i]) * (testy - verty[i]) / (verty[j] - verty[i]) + vertx[i]
+            x = (vertx[j] - vertx[i]) * (testy - verty[i]) / \
+                (verty[j] - verty[i]) + vertx[i]
             if ((verty[i] > testy) != (verty[j] > testy)) and (testx < x):
                 res = not res
             j = i
@@ -237,7 +239,8 @@ class VeSortCount:
         :return: midpoint of box
         """
         minX, minY, maxX, maxY = box
-        midpoint = (int((minX + maxX) / 2), int((minY + maxY) / 2))  # minus y coordinates to get proper xy format
+        # minus y coordinates to get proper xy format
+        midpoint = (int((minX + maxX) / 2), int((minY + maxY) / 2))
         return midpoint
 
     def _ccw(self,
@@ -285,7 +288,8 @@ class VeSortCount:
                 track_id = int(track[4])
                 label = track[-1]
                 midpoint = self._tlbr_midpoint(bbox)
-                origin_midpoint = (midpoint[0], 1920 - midpoint[1])  # 1080==im.shape[0]
+                # 1080==im.shape[0]
+                origin_midpoint = (midpoint[0], 1920 - midpoint[1])
 
                 if track_id not in self.paths and label in [0, 1, 4, 5]:
                     self.paths[track_id] = deque(maxlen=2)
@@ -293,7 +297,8 @@ class VeSortCount:
 
                 self.paths[track_id].append(midpoint)
                 previous_midpoint = self.paths[track_id][0]
-                origin_previous_midpoint = (previous_midpoint[0], 1920 - previous_midpoint[1])  # 1080==im.shape[0]
+                origin_previous_midpoint = (
+                    previous_midpoint[0], 1920 - previous_midpoint[1])  # 1080==im.shape[0]
 
                 for i in range(len(line)):
 
@@ -303,9 +308,11 @@ class VeSortCount:
                         self.class_counter[self.track_cls] += 1
                         self.total_counter += 1
 
-                        self.already_counted.append(track_id)  # Set already counted for ID to true.
+                        # Set already counted for ID to true.
+                        self.already_counted.append(track_id)
 
-                        self.angle = self._vector_angle(origin_midpoint, origin_previous_midpoint)
+                        self.angle = self._vector_angle(
+                            origin_midpoint, origin_previous_midpoint)
 
                         if self.angle > 0:
                             self.up_count[i] += 1
@@ -381,211 +388,222 @@ class PeSortCount:
     def getPeSortCountResult(self):
         return self.count
 
-# class ReverseVehicle:
-#     def __init__(self,
-#                  count: int,
-#                  last_seen_time: float):
-#         self.count = count
-#         self.last_seen_time = last_seen_time
-#
-#
-# class ReverseDrivingDetector:
-#     def isAngleInReverseRange(self,
-#                               carDir: float) -> bool:
-#         # logger_reverse_driving.info(
-#         #     "isAngleInReverseRange :"+"road_dir="+str(self.ROAD_DIR)+" carDir="+str(carDir))
-#
-#         # 计算角度ROAD_DIR的反向角度ra
-#         ra = self.ROAD_DIR + 180 if self.ROAD_DIR < 180 else self.ROAD_DIR - 180
-#         # 计算角度b与ra的差值db，考虑边界情况
-#         db = carDir - ra
-#         # logger_reverse_driving.info(
-#         #     "isAngleInReverseRange :" + " ra= " + str(ra) + " db=" + str(db))
-#         if db > 180:
-#             db -= 360
-#         elif db < -180:
-#             db += 360
-#         # 判断角度b是否在角度a的反向范围内上下30度
-#         return db >= -ReverseDriving.SCOPE and db <= ReverseDriving.SCOPE
-#
-#     def checkForReverseDriving(self,
-#                                id: int,
-#                                carDir: float,
-#                                speed: float) -> int:
-#         if self.isAngleInReverseRange(carDir) and speed >= ReverseDriving.SPEED_THRESHOLD:
-#             # logger_reverse_driving.info(
-#             #     "checkForReverseDriving: " + str(id) + " ReverseDriving")
-#             current_time = time.monotonic()
-#             # 去掉map中触发逆行较久的数据
-#             for i in list(self.count_map.keys()):
-#                 elapsed_time = current_time - self.count_map[i].last_seen_time
-#                 if elapsed_time > ReverseDriving.REMOVE_TIME:
-#                     del self.count_map[i]
-#             if id not in self.count_map:
-#                 self.count_map[id] = ReverseVehicle(0, current_time)
-#
-#             self.count_map[id].count += 1
-#             self.count_map[id].last_seen_time = current_time
-#
-#             # 当检测到当前id车辆的逆行次数超过ReverseDriving.COUNT时，触发逆行事件报警，并将该车的逆行计数清零
-#             if self.count_map[id].count >= ReverseDriving.COUNT:
-#                 # logger_reverse_driving.info(
-#                 #     "checkForReverseDriving: " + str(id) + " ReverseDriving")
-#                 self.count_map[id].count = 0
-#                 return id
-#             else:
-#                 return -1
-#         else:
-#             # logger_reverse_driving.info(
-#             #     "checkForReverseDriving: " + str(id) + " no ReverseDriving")
-#             return -1
-#
-#     def calcMedian(self,
-#                    angles: list[float]) -> float:
-#         n = len(angles)
-#         if n % 2 == 0:
-#             return (angles[n // 2 - 1] + angles[n // 2]) / 2
-#         else:
-#             return angles[n // 2]
-#
-#     def calcMean(self,
-#                  angles: list[float]) -> float:
-#         n = len(angles)
-#
-#         if n < ReverseDriving.VECTOR_SIZE:
-#             return 0
-#
-#         angles.sort()
-#         median = self.calcMedian(angles)
-#         diffs = [abs(angle - median) for angle in angles]
-#         q1 = self.calcMedian(angles[:n // 2])
-#         q3 = self.calcMedian(angles[n // 2 + n % 2:])
-#         iqr = q3 - q1
-#         threshold = 1.5 * iqr
-#         sumAngle = 0
-#         count = 0
-#         for i, angle in enumerate(angles):
-#             if diffs[i] <= threshold:
-#                 sumAngle += angle
-#                 count += 1
-#         self.ROAD_DIR = sumAngle / count
-#         return sumAngle / count
-#
-#     def __init__(self, roadDir):
-#         self.count_map = {}
-#         self.angles = []
-#         self.ROAD_DIR = roadDir
-#
-#
-# class CongestionLevel(Enum):
-#     CLEAR = 0  # 畅通
-#     LIGHT = 1  # 轻度拥堵
-#     MODERATE = 2  # 中度拥堵
-#     SERIOUS = 3  # 严重拥堵
-#     INVALID = 4  # 无效值
-#
-#     # 定义目标物的数据结构
-#
-#
-# class Target:
-#     def __init__(self):
-#         self.enter_time = datetime.now()
-#         self.last_seen_time = datetime.now()
-#         self.duration_time = 0.0
-#         self.flag = False
-#
-#
-# class CongestionDetector:
-#     def __init__(self):
-#         self.m_targets: Dict[int, Target] = {}  # 用于存储目标物的数据结构
-#         self.m_mutex = threading.Lock()  # 用于保护数据结构的读写
-#         self.total_time = 0.0  # 时间间隔内，车辆通过路段的总耗时
-#         self.m_vehicle_counts = 0  # 时间间隔内，通过路段的车辆数
-#         self.m_average_speed = 0
-#
-#     def addObject(self, id: int):
-#         if self.isInmap(id):
-#             self.updateTarget(id)
-#         else:
-#             self.addTarget(id)
-#
-#     def addTarget(self, id: int):
-#         with self.m_mutex:
-#             current_time = datetime.now()
-#             self.m_targets[id] = Target()
-#             self.m_targets[id].enter_time = current_time
-#             self.m_targets[id].last_seen_time = current_time
-#
-#     def updateTarget(self, id: int):
-#         with self.m_mutex:
-#             current_time = datetime.now()
-#             if id in self.m_targets:
-#                 self.m_targets[id].last_seen_time = current_time
-#                 # print(self.m_targets[id].last_seen_time)
-#                 if self.m_targets[id].flag == True:
-#                     self.total_time -= self.m_targets[id].duration_time
-#                     self.m_targets[id].flag = False
-#                     self.m_vehicle_counts -= 1
-#
-#     def calTotalTime(self):
-#         while True:
-#             time.sleep(Congestion.CAL_INTERVAL / 1000)
-#             # print(1)
-#             current_time = datetime.now()
-#             self.m_mutex.acquire()
-#             for target_id, target in list(self.m_targets.items()):
-#                 elapsed_time = (
-#                         current_time - target.last_seen_time).total_seconds()
-#                 if elapsed_time > Congestion.TIME_INTERVAL:
-#                     self.total_time -= self.m_targets[target_id].duration_time
-#                     if self.total_time < 0.00001:
-#                         self.total_time = 0
-#                     del self.m_targets[target_id]
-#                     self.m_vehicle_counts -= 1
-#                 elif elapsed_time > Congestion.DEPARTURE_TIME:
-#                     if target.flag != True:
-#                         self.total_time += (current_time -
-#                                             target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
-#                         self.m_targets[target_id].duration_time = (current_time -
-#                                                                    target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
-#                         self.m_targets[target_id].flag = True
-#                         self.m_vehicle_counts += 1
-#                 else:
-#                     pass
-#             self.m_mutex.release()
-#
-#     def getTotalTime(self):
-#         # logger_congestion.info("getTotalTime " + str(self.total_time))
-#         return self.total_time
-#
-#     def isInmap(self, id: int):
-#         return id in self.m_targets
-#
-#     def getVehicleCounts(self):
-#         # logger_congestion.info("getVehicleCounts " + str(self.m_vehicle_counts))
-#         return self.m_vehicle_counts
-#
-#     def get_average_speed(self):
-#         if self.total_time <= 0:
-#             self.m_average_speed = 0
-#         else:
-#             self.m_average_speed = Congestion.ROAD_LENGTH * self.m_vehicle_counts / self.total_time * 3.6
-#             self.m_average_speed = Congestion.ROAD_LENGTH * \
-#                                    self.m_vehicle_counts / self.total_time * 3.6
-#         # logger_congestion.info("get_average_speed " + str(self.m_average_speed))
-#         return self.m_average_speed
-#
-#     def check_congestion_level(self):
-#         ratio = self.m_average_speed / Congestion.FREE_VELOCITY
-#         # logger_congestion.info("check_congestion_level " + str(ratio))
-#
-#         if ratio == 0:
-#             return CongestionLevel.INVALID
-#         elif ratio > 0.7:
-#             return CongestionLevel.CLEAR
-#         elif ratio > 0.5:
-#             return CongestionLevel.LIGHT
-#         elif ratio > 0.3:
-#             return CongestionLevel.MODERATE
-#         else:
-#             return CongestionLevel.SERIOUS
+
+class ReverseVehicle:
+    def __init__(self, count: int, last_seen_time: float):
+        self.count = count
+        self.last_seen_time = last_seen_time
+
+
+class ReverseDrivingDetector:
+    def isAngleInReverseRange(self, carDir: float) -> bool:
+        # logger_reverse_driving.info(
+        #     "isAngleInReverseRange :"+"road_dir="+str(self.ROAD_DIR)+" carDir="+str(carDir))
+        # 计算角度ROAD_DIR的反向角度ra
+        ra = self.ROAD_DIR + 180 if self.ROAD_DIR < 180 else self.ROAD_DIR - 180
+
+        # 计算角度b与ra的差值db，考虑边界情况
+        db = carDir - ra
+        # logger_reverse_driving.info(
+        #     "isAngleInReverseRange :"+" ra= "+str(ra)+" db="+str(db))
+        if db > 180:
+            db -= 360
+        elif db < -180:
+            db += 360
+
+        # 判断角度b是否在角度a的反向范围内上下30度
+        return db >= -ReverseDriving.SCOPE and db <= ReverseDriving.SCOPE
+
+    def checkForReverseDriving(self, id: int, carDir: float, speed: float) -> int:
+        if self.isAngleInReverseRange(carDir) and speed >= ReverseDriving.SPEED_THRESHOLD:
+            # logger.info(
+            #     "checkForReverseDriving: "+str(id)+" ReverseDriving")
+            current_time = time.monotonic()
+            # 去掉map中触发逆行较久的数据
+            for i in list(self.count_map.keys()):
+                elapsed_time = current_time - self.count_map[i].last_seen_time
+                if elapsed_time > ReverseDriving.REMOVE_TIME:
+                    del self.count_map[i]
+
+            if id not in self.count_map:
+                self.count_map[id] = ReverseVehicle(1, current_time)
+            else:
+                self.count_map[id].count += 1
+                self.count_map[id].last_seen_time = current_time
+
+            logger_reverse_driving.info(
+                "checkForReverseDriving:id"+id+" count"+self.count_map[id].count)
+
+            # 当检测到当前id车辆的逆行次数超过ReverseDriving.COUNT时，触发逆行事件报警，并将该车的逆行计数清零
+            if self.count_map[id].count >= ReverseDriving.COUNT:
+                # logger_reverse_driving.info(
+                #     "checkForReverseDriving: "+str(id)+" ReverseDriving")
+                self.count_map[id].count = 0
+                return id
+            else:
+                return -1
+        else:
+            # logger_reverse_driving.info(
+            #     "checkForReverseDriving: "+str(id)+" no ReverseDriving")
+            return -1
+
+    def calcMedian(self, angles) -> float:
+        n = len(angles)
+        if n % 2 == 0:
+            return (angles[n // 2 - 1] + angles[n // 2]) / 2
+        else:
+            return angles[n // 2]
+
+    def calcMean(self, angles) -> float:
+        n = len(angles)
+
+        if n < ReverseDriving.VECTOR_SIZE:
+            return 0
+        angles.sort()
+        median = self.calcMedian(angles)
+        # print(sum(angles)/n)
+        # print(median)
+        diffs = [abs(angle - median) for angle in angles]
+        q1 = self.calcMedian(angles[:n // 2])
+        q3 = self.calcMedian(angles[n // 2 + n % 2:])
+        iqr = q3 - q1
+        threshold = 1.5 * iqr
+
+        sumAngle = 0
+        count = 0
+        for i, angle in enumerate(angles):
+            if diffs[i] <= threshold:
+                sumAngle += angle
+                count += 1
+
+        self.ROAD_DIR = sumAngle / count
+        return sumAngle / count
+
+    def __init__(self, roadDir):
+        self.count_map = {}
+        self.angles = []
+        self.ROAD_DIR = roadDir
+
+
+class CongestionLevel(Enum):
+    CLEAR = 0  # 畅通
+    LIGHT = 1  # 轻度拥堵
+    MODERATE = 2  # 中度拥堵
+    SERIOUS = 3  # 严重拥堵
+    INVALID = 4  # 无效值
+
+
+# 定义目标物的数据结构
+class Target:
+    def __init__(self):
+        self.enter_time = datetime.datetime.now()
+        self.last_seen_time = datetime.datetime.now()
+        self.duration_time = 0.0
+        self.flag = False  # 离开标志位,false代表目标车辆还在当前路段,true表示已经离开路段
+
+
+class CongestionDetector:
+    def __init__(self):
+        self.m_targets: Dict[int, Target] = {}  # 用于存储目标物的数据结构
+        self.m_mutex = threading.Lock()  # 用于保护数据结构的读写
+        self.total_time = 0.0  # 时间间隔内，车辆通过路段的总耗时
+        self.m_vehicle_counts = 0  # 时间间隔内，通过路段的车辆数
+        self.m_average_speed = 0
+
+    def addObject(self, id: int):
+        if self.isInmap(id):
+            self.updateTarget(id)
+        else:
+            self.addTarget(id)
+
+    def addTarget(self, id: int):
+        with self.m_mutex:
+            current_time = datetime.datetime.now()
+            self.m_targets[id] = Target()
+            self.m_targets[id].enter_time = current_time
+            self.m_targets[id].last_seen_time = current_time
+
+    def updateTarget(self, id: int):
+        with self.m_mutex:
+            current_time = datetime.datetime.now()
+            # print(current_time)
+            if id in self.m_targets:
+                self.m_targets[id].last_seen_time = current_time
+                # print(self.m_targets[id].last_seen_time)
+                # 在统计周期内，但默认已经离开路段的目标物，再次出现在路段中时，把统计到的内容从总量中去掉
+                if self.m_targets[id].flag == True:
+                    self.total_time -= self.m_targets[id].duration_time
+                    self.m_targets[id].flag = False
+                    self.m_vehicle_counts -= 1
+
+    def calTotalTime(self):
+        logger_congestion.info("start cal total time")
+        while True:
+            time.sleep(Congestion.CAL_INTERVAL / 1000)
+            current_time = datetime.datetime.now()
+            self.m_mutex.acquire()
+
+            # 遍历map中的所有目标物，计算它最后出现的时间距离现在多久，如果超过Congestion.TIME_INTERVAL，认为已经超过统计的要求时间，该目标物不再有价值
+            for target_id, target in list(self.m_targets.items()):
+                elapsed_time = (
+                    current_time - target.last_seen_time).total_seconds()
+                if elapsed_time > Congestion.TIME_INTERVAL:
+                    self.total_time -= self.m_targets[target_id].duration_time
+                    if self.total_time < 0.00001:
+                        self.total_time = 0
+                    del self.m_targets[target_id]
+                    self.m_vehicle_counts -= 1
+                    logger_congestion.info("vehicle remove area id"+target_id)
+                # 如果在统计周期内，但是大于Congestion.DEPARTURE_TIME，表示该车已经这么多秒没有出现在视野中，视为已经离开，那就把这辆车的数据统计到总时长和车辆计数中。
+                elif elapsed_time > Congestion.DEPARTURE_TIME:
+                    if target.flag != True:
+
+                        self.m_targets[target_id].duration_time = (current_time -
+                                                                   target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
+                        # 过滤掉在当前路段停留时间小于两秒的车辆信息，避免误检和漏检车辆数据干扰最终结果
+                        if self.m_targets[target_id].duration_time > 2:
+                            self.total_time += (current_time -
+                                                target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
+                            logger_congestion.info("cal vechicle driving time info id"+str(
+                                target_id)+" total time"+str(self.m_targets[target_id].duration_time))
+                            self.m_targets[target_id].flag = True
+                            self.m_vehicle_counts += 1
+                        # logger.info("cal vechicle info id"+str(target_id))
+                else:
+                    pass
+            self.m_mutex.release()
+
+    def getTotalTime(self):
+        # logger.info("getTotalTime "+str(self.total_time))
+        return self.total_time
+
+    def isInmap(self, id: int):
+        return id in self.m_targets
+
+    def getVehicleCounts(self):
+        # logger.info("getVehicleCounts "+str(self.m_vehicle_counts))
+        return self.m_vehicle_counts
+
+    def get_average_speed(self):
+        if self.total_time <= 0:
+            self.m_average_speed = 0
+        else:
+            self.m_average_speed = Congestion.ROAD_LENGTH * \
+                self.m_vehicle_counts / self.total_time * 3.6
+        # logger.info("cal get_average_speed "+str(self.m_average_speed))
+        return self.m_average_speed
+
+    def check_congestion_level(self):
+        ratio = self.m_average_speed / Congestion.FREE_VELOCITY
+        # logger.info("cal check_congestion_level "+str(ratio))
+
+        if ratio == 0:
+            return CongestionLevel.INVALID
+        elif ratio > 0.7:
+            return CongestionLevel.CLEAR
+        elif ratio > 0.5:
+            return CongestionLevel.LIGHT
+        elif ratio > 0.3:
+            return CongestionLevel.MODERATE
+        else:
+            return CongestionLevel.SERIOUS
