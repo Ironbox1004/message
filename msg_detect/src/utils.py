@@ -24,12 +24,17 @@ def merge_list(*args,
     return result
 
 
-def ros2bbox_2d(ros_result
+def ros2bbox_2d(
+        ros_result:list
                 ):
+    frame_id = ros_result.frame_id
+    frame_name = ros_result.frame_name
+
     top_lefts_x, top_lefts_y = [], []
     bottom_rights_x, bottom_rights_y = [], []
     track_ids = []
     labels = []
+    detect_2d = []
 
     for obs in ros_result.obs:
 
@@ -48,7 +53,13 @@ def ros2bbox_2d(ros_result
                                     track_ids,
                                     labels, fill_value='_')
 
-    return new_results_2d
+        detect_2d.append({
+            "frame_id": frame_id,
+            "frame_name": frame_name,
+            "bboxes_results": new_results_2d
+        })
+
+    return detect_2d
 
 
 def ros2bbox_3d(ros_result
@@ -58,8 +69,7 @@ def ros2bbox_3d(ros_result
     points_y = []
 
     for result in ros_result.result3D:
-        result.road_id = int(
-            result.road_id) if result.road_id != '' else int(-1)
+        result.road_id = int(result.road_id) if result.road_id != '' else int(-1)
 
         road_ids.append(result.road_id)
         points_x.append(result.center[0])
@@ -108,8 +118,7 @@ class RegionalJudgmentSort:
             if (verty[j] - verty[i]) == 0:
                 j = i
                 continue
-            x = (vertx[j] - vertx[i]) * (testy - verty[i]) / \
-                (verty[j] - verty[i]) + vertx[i]
+            x = (vertx[j] - vertx[i]) * (testy - verty[i]) / (verty[j] - verty[i]) + vertx[i]
             if ((verty[i] > testy) != (verty[j] > testy)) and (testx < x):
                 res = not res
             j = i
@@ -156,7 +165,7 @@ class RegionalJudgmentSort:
     def PersonJudgment(self,
                        sort_results: list,
                        roi: list
-                       ):
+                       ) -> None:
         """
         :param sort_results: sort results
         :param roi: dangerous area
@@ -181,7 +190,7 @@ class RegionalJudgmentSort:
         }
 
     def VehicleJudgment(self,
-                        lists):
+                        lists:list) -> None:
         self.classified_lists.clear()
         self.distances.clear()
         self.nums.clear()
@@ -203,7 +212,7 @@ class RegionalJudgmentSort:
                                                         sublist[j][1:3])
                     self.distances[key].append(distance)
 
-    def getPersonResult(self):
+    def getPersonResult(self) -> dict:
         return self.in_bbox
 
     def getVehicleResult(self):
@@ -213,24 +222,27 @@ class RegionalJudgmentSort:
 
 class VeSortCount:
     def __init__(self,
-                 up_count=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                 down_count=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                 already_counted=deque(maxlen=500),
-                 class_counter=Counter(),
-                 paths={},
-                 total_counter=0,
-                 track_cls=0,
-                 total_track=0,
-                 last_track_id=-1,
-                 angle=-1
+                 up_count=None,
+                 down_count=None,
+                 already_counted=None,
+                 class_counter=None,
+                 paths=None,
+                 total_counter=None,
+                 track_cls=None,
+                 total_track=None,
+                 last_track_id=None,
+                 angle=None
                  ):
-        self.already_counted = already_counted
-        self.class_counter = class_counter
-        self.paths = paths
-        self.total_counter, self.track_cls, self.up_count, self.down_count, self.total_track = \
-            total_counter, track_cls, up_count, down_count, total_track
-        self.last_track_id = last_track_id
-        self.angle = angle
+        self.up_count = up_count if up_count is not None else [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.down_count = down_count if down_count is not None else [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.already_counted = already_counted if already_counted is not None else deque(maxlen=1)
+        self.class_counter = class_counter if class_counter is not None else Counter()
+        self.paths = paths if paths is not None else {}
+        self.total_counter = total_counter if total_counter is not None else 0
+        self.track_cls = track_cls if track_cls is not None else 0
+        self.total_track = total_track if total_track is not None else 0
+        self.last_track_id = last_track_id if last_track_id is not None else -1
+        self.angle = angle if angle is not None else -1
 
     def _tlbr_midpoint(self,
                        box: list):
@@ -239,8 +251,7 @@ class VeSortCount:
         :return: midpoint of box
         """
         minX, minY, maxX, maxY = box
-        # minus y coordinates to get proper xy format
-        midpoint = (int((minX + maxX) / 2), int((minY + maxY) / 2))
+        midpoint = (int((minX + maxX) / 2), int((minY + maxY) / 2))  # minus y coordinates to get proper xy format
         return midpoint
 
     def _ccw(self,
@@ -281,24 +292,23 @@ class VeSortCount:
 
     def veSortCount(self,
                     sort_results,
-                    line: list):
+                    line: list,
+                    sort_label: list):
         if len(sort_results) > 0:
             for track in sort_results:
                 bbox = track[:4]
                 track_id = int(track[4])
                 label = track[-1]
                 midpoint = self._tlbr_midpoint(bbox)
-                # 1080==im.shape[0]
-                origin_midpoint = (midpoint[0], 1920 - midpoint[1])
+                origin_midpoint = (midpoint[0], 1920 - midpoint[1])  # 1080==im.shape[0]
 
-                if track_id not in self.paths and label in [0, 1, 4, 5]:
+                if track_id not in self.paths and label in sort_label:
                     self.paths[track_id] = deque(maxlen=2)
                     self.total_track = track_id
 
                 self.paths[track_id].append(midpoint)
                 previous_midpoint = self.paths[track_id][0]
-                origin_previous_midpoint = (
-                    previous_midpoint[0], 1920 - previous_midpoint[1])  # 1080==im.shape[0]
+                origin_previous_midpoint = (previous_midpoint[0], 1920 - previous_midpoint[1])  # 1080==im.shape[0]
 
                 for i in range(len(line)):
 
@@ -308,11 +318,9 @@ class VeSortCount:
                         self.class_counter[self.track_cls] += 1
                         self.total_counter += 1
 
-                        # Set already counted for ID to true.
-                        self.already_counted.append(track_id)
+                        self.already_counted.append(track_id)  # Set already counted for ID to true.
 
-                        self.angle = self._vector_angle(
-                            origin_midpoint, origin_previous_midpoint)
+                        self.angle = self._vector_angle(origin_midpoint, origin_previous_midpoint)
 
                         if self.angle > 0:
                             self.up_count[i] += 1
@@ -326,17 +334,17 @@ class VeSortCount:
 
 class PeSortCount:
     def __init__(self,
-                 boxes=[],
-                 label=[],
-                 indexIDs=[],
-                 memory={},
-                 count=[0, 0, 0, 0]):
+                 boxes=None,
+                 label=None,
+                 indexIDs=None,
+                 memory=None,
+                 count=None):
         super().__init__()
-        self.boxes = boxes
-        self.label = label
-        self.indexIDs = indexIDs
-        self.memory = memory
-        self.count = count
+        self.boxes = boxes if boxes is not None else []
+        self.label = label if label is not None else []
+        self.indexIDs = indexIDs if indexIDs is not None else []
+        self.memory = memory if memory is not None else {}
+        self.count = count if count is not None else [0, 0, 0, 0]
 
     def _ccw(self, A, B, C):
         """
@@ -388,7 +396,6 @@ class PeSortCount:
     def getPeSortCountResult(self):
         return self.count
 
-
 class ReverseVehicle:
     def __init__(self, count: int, last_seen_time: float):
         self.count = count
@@ -432,7 +439,7 @@ class ReverseDrivingDetector:
                 self.count_map[id].last_seen_time = current_time
 
             logger_reverse_driving.info(
-                "checkForReverseDriving:id"+id+" count"+self.count_map[id].count)
+                "checkForReverseDriving:id"+str(id)+" count"+str(self.count_map[id].count))
 
             # 当检测到当前id车辆的逆行次数超过ReverseDriving.COUNT时，触发逆行事件报警，并将该车的逆行计数清零
             if self.count_map[id].count >= ReverseDriving.COUNT:
@@ -553,7 +560,7 @@ class CongestionDetector:
                         self.total_time = 0
                     del self.m_targets[target_id]
                     self.m_vehicle_counts -= 1
-                    logger_congestion.info("vehicle remove area id"+target_id)
+                    logger_congestion.info("vehicle remove area id"+str(target_id))
                 # 如果在统计周期内，但是大于Congestion.DEPARTURE_TIME，表示该车已经这么多秒没有出现在视野中，视为已经离开，那就把这辆车的数据统计到总时长和车辆计数中。
                 elif elapsed_time > Congestion.DEPARTURE_TIME:
                     if target.flag != True:

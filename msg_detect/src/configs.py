@@ -6,20 +6,21 @@ ROOT = FILE.parents[0]
 
 class METAINFO:
     installLocation = ROOT
-    publishTime = 50
+    state_publishTime = 120.0
+    statistics_publishTime = 60.0
     logLocation = ROOT / 'msg_log'
     App_description = "*Application status information reporting*"
 
 # 车道信息，车道数，车道id，对应行驶角度
 class LaneInfo:
-    laneNums = 4
-    laneIdList = [2, 1, 5, 7]
-    laneAngles = [90, 180, 160, 70]
+    laneNums = 5
+    laneIdList = [-1, 1, 2, 4, 3]
+    laneAngles = [90, 180, 160,70, 50]
 
 class ReverseDriving:
     COUNT = 3 # 当前id车辆逆行次数超过这个值时，并且满足下面的SPEED_THRESHOLD行驶速度，就会上报逆行事件
     IS_ROAD_DIR = True
-    # ROAD_DIR = 180
+    ROAD_DIR = 180
     SCOPE = 30.0 # 判断逆行的角度范围，如果车辆航向角在道路指定范围的反向+-SCOPE范围内，即可认为是逆行方向
     REMOVE_TIME = 60 # 当记录逆行车辆未达逆行检测次数，并后续时间内没有捕捉到车辆逆行，就将该id的逆行记录去掉
     VECTOR_SIZE = 100
@@ -27,10 +28,10 @@ class ReverseDriving:
 
 
 class Congestion:
-    ROAD_LENGTH = 15  # meters  监控路段长度
-    DEPARTURE_TIME = 5  # seconds  目标指定时间未出现后，认为目标离开监控路段
-    TIME_INTERVAL = 15  # seconds  拥堵判断统计周期
-    FREE_VELOCITY = 50  # km/h  道路的自由流速度
+    ROAD_LENGTH = 15  # meters 监控路段长度
+    DEPARTURE_TIME = 5  # seconds 目标指定时间未出现后，认为目标离开监控路段
+    TIME_INTERVAL = 15  # seconds 拥堵判断统计周期
+    FREE_VELOCITY = 50  # km/h 道路的自由流速度
     CAL_INTERVAL = 10  # ms cal vector  定时计算总耗时的间隔
 
 
@@ -50,8 +51,13 @@ class PersonDangerArea:
     roi_1 = [[1508, 99], [1394, 105], [1572, 293], [1848, 267], [1856, 133]]
     roi_2 = [[850, 23], [850, 179], [1128, 179], [1128, 23]]
     roi_3 = [[1445, 80], [1445, 328], [1842, 328], [1842, 80]]
-    roi = [roi_1, roi_2, roi_3]
+    roi_list_1 = [roi_1, roi_2]
+    roi_list_2 = [roi_3]
 
+    camera = {
+        "hik_camera": roi_list_1,
+        "dahua_camera": roi_list_2,
+    }
 
 class PersonSortList:
     list = [
@@ -168,6 +174,8 @@ class PositionObject:
 
 
 class event_data:
+    even_frame_id = None
+    even_frame_name = None
     event_id = 0
     event_type = 1
     description = "None"
@@ -187,16 +195,14 @@ class report_data:
     # timestamp = None
 
 
-
-
 class Vehicle:
-     def __init__(self,track_id,lane_id,heading,speed,lon,lat) -> None:
-        self.track_id=track_id
-        self.lane_id=lane_id
-        self.heading=heading
-        self.speed=speed
-        self.lon=lon
-        self.lat=lat
+    def __init__(self, track_id, lane_id, heading, speed, lon, lat) -> None:
+        self.track_id = track_id
+        self.lane_id = lane_id
+        self.heading = heading
+        self.speed = speed
+        self.lon = lon
+        self.lat = lat
 
 logger_danger_area_detect = \
     LogManager('PersonDangerArea').get_logger_and_add_handlers(10,

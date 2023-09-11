@@ -28,7 +28,7 @@
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
-    "last_opened_file_path": "/home/chenzhen/work-code/github/yoloair2",
+    "last_opened_file_path": "/home/chenzhen/work-code/script_code",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -59,6 +59,8 @@
       <workItem from="1692083445846" duration="1198000" />
       <workItem from="1692238818690" duration="2051000" />
       <workItem from="1692251054682" duration="11000" />
+      <workItem from="1692941242815" duration="1488000" />
+      <workItem from="1692947840105" duration="14000" />
     </task>
     <servers />
   </component>
