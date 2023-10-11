@@ -20,6 +20,9 @@ import crcmod.predefined
 class MessageHandler:
     def __init__(self):
 
+        self.vehicle_sort_label = [0, 1, 4, 5]
+        self.person_sort_label = [3]
+
         # self.is_set_PublishTime = False if METAINFO.publishTime is None else True
         self.vehicle_last_timestamp = time.time()
         self.person_last_timestamp = time.time()
@@ -29,13 +32,14 @@ class MessageHandler:
         self.events_lock = threading.Lock()
         self.report_lock = threading.Lock()
 
-        self.report_list_vehicle = [[], []]
+        self.report_list_vehicle = [[], [], []]
         self.report_lock_vehicle = threading.Lock()
-        self.old_vehicle_data = [0, 0, 0, 0, 0, 0, 0, 0]
+        self.old_vehicle_data = [0] * 6
+        self.old_vehicle_class_counter = [0] * 6
 
         self.report_list_person = [[], []]
         self.report_lock_person = threading.Lock()
-        self.old_person_data = [0, 0, 0, 0]
+        self.old_person_data = [0] * 6
 
         rospy.init_node('event_message', anonymous=True)
 
@@ -57,13 +61,14 @@ class MessageHandler:
         # 业务数据上报
         self.data_report_msg = Message()
 
-        self.send_time1 = rospy.Time.now() + rospy.Duration(1.0)
-        self.send_time2 = rospy.Time.now() + rospy.Duration(1.0)
-        self.send_time3 = rospy.Time.now() + rospy.Duration(1.0)
+        self.send_time_states = rospy.Time.now() + rospy.Duration(1.0)
+        self.send_time_report_vehicle_data = rospy.Time.now() + rospy.Duration(1.0)
+        self.send_time_report_person_data = rospy.Time.now() + rospy.Duration(1.0)
 
         # 检测函数初始化
         # self.people_sort = VeSortCount()
-        self.vehicle_sort_count = VeSortCount()
+        self.vehicle_sort_count = SortCount()
+        self.person_sort_count = SortCount()
 
         self.crc16 = crcmod.predefined.mkPredefinedCrcFun('crc16')
         # 给运维模块发送的消息计数，报文序列号，范围是0x0001~0xFFFF
@@ -91,55 +96,40 @@ class MessageHandler:
         车流量统计
         '''
         bboxes = results_2d[0]["bboxes_results"]
-        reporData = report_data()
-        reporData.queueLength = []
-        self.vehicle_sort_count.veSortCount(bboxes, VehicleSortList.list, [0, 1, 4, 5])
-        up_count_1, down_count_1 = self.vehicle_sort_count.getVeSortCountResult()
-        results_list = [x + y for x, y in zip(up_count_1, down_count_1)]
-        # 自定义发送事件设置，需测试功能
-        # current_timestamp = time.time()
-        # if self.is_set_PublishTime:
-        #     if current_timestamp - self.vehicle_last_timestamp >= METAINFO.publishTime:
-        #         up_count_2, down_count_2 = vehicle_sort_count.getVeSortCountResult()
-        #         results_list_2 = [x + y for x, y in zip(up_count_2, down_count_2)]
-        #         results_list = [x - y for x, y in zip(results_list_2, results_list)]
-        #         self.vehicle_last_timestamp = current_timestamp
+        reportData = report_data()
+        reportData.AllCounts = []
+        reportData.ClassCounter = []
 
-        # results = {index: value for index, value in enumerate(results_list)}
-        reporData.queueLength.append(results_list)
+        self.vehicle_sort_count.SortCountCal(bboxes, VehicleSortList.list, self.vehicle_sort_label)
+        class_counter, all_counts = self.vehicle_sort_count.getSortCountResults()
+
+        reportData.ClassCounter.append(class_counter)
+        reportData.AllCounts.append(all_counts)
+
         logger_vehicle_sort.info("当前车流量为:{}".
-                                 format(results_list))
+                                 format(all_counts))
         with self.report_lock_vehicle:
             self.report_list_vehicle[0] = ["0x05"]
-            self.report_list_vehicle[1] = reporData.queueLength
+            self.report_list_vehicle[1] = reportData.AllCounts
+            self.report_list_vehicle[2] = reportData.ClassCounter
 
     def ps_handler(self, results_2d):
         '''
         人流量统计
         '''
-        people_sort = PeSortCount()
         bboxes = results_2d[0]["bboxes_results"]
-        reporData = report_data()
-        reporData.queueLength = []
-        people_sort.peSortCount(bboxes, PersonSortList.list)
-        people_sort_count = people_sort.getPeSortCountResult()
-        # results = {index: value for index, value in enumerate(people_sort_count)}
-        # 自定义发送事件设置，需测试功能
-        # current_timestamp = time.time()
-        # if self.is_set_PublishTime:
-        #     if current_timestamp - self.person_last_timestamp >= METAINFO.publishTime:
-        #         people_sort_count_2 = people_sort.getPeSortCountResult()
-        #         results = {index: value for index, value in enumerate(people_sort_count_2)}
-        #         results = {index: value - people_sort_count[index] for index, value in enumerate(results)}
-        #         self.person_last_timestamp = current_timestamp
+        reportData = report_data()
+        reportData.AllCounts = []
+        self.person_sort_count.SortCountCal(bboxes, PersonSortList.list, self.person_sort_label)
+        class_counter, all_counts = self.person_sort_count.getSortCountResults()
 
-        reporData.queueLength.append(people_sort_count)
+        reportData.AllCounts.append(all_counts)
         logger_person_sort.info("当前人流量为:{}".
-                                format(people_sort_count))
-        people_sort_count.clear()
+                                format(all_counts))
+
         with self.report_lock_person:
             self.report_list_person[0] = ["0x04"]
-            self.report_list_person[1] = reporData.queueLength
+            self.report_list_person[1] = reportData.AllCounts
 
     def ad_handler(self, results_2d):
         '''
@@ -464,16 +454,20 @@ class MessageHandler:
 
             with self.report_lock_vehicle:
                 self.report_count += 1
+                NowClassList = [self.report_list_vehicle[2][0].get(item, 0) for item in self.vehicle_sort_label]
                 report_data["type"] = int(self.report_list_vehicle[0][0], 16)
-                preveicle_results = [x - y for x, y in zip(self.report_list_vehicle[1][0], self.old_vehicle_data)]
-                report_data["data"] = {index: value for index, value in enumerate(preveicle_results)}
+                TrafficFlow = [x - y for x, y in zip(self.report_list_vehicle[1][0], self.old_vehicle_data)]
+                report_data["Flow"] = {index: value for index, value in enumerate(TrafficFlow)}
+                ClassFlow = [x - y for x, y in zip(NowClassList, self.old_vehicle_class_counter)]
 
-                logger_vehicle_sort.info("当前车流量差值为:{}".
-                                         format(preveicle_results))
+                logger_vehicle_sort.info("当前车流量差值为:{},路口通行车辆类别为:{}".
+                                         format(TrafficFlow, ClassFlow))
 
                 report_data["timestamp"] = ms_time_str
                 self.old_vehicle_data = self.report_list_vehicle[1][0]
-                self.report_list_vehicle = [[], []]
+                self.old_vehicle_class_counter = [self.report_list_vehicle[2][0].get(item, 0)
+                                                  for item in self.vehicle_sort_label]
+                self.report_list_vehicle = [[], [], []]
 
             data_json_result = json.dumps(report_data)
             data_json_result = bytes(data_json_result, encoding="utf8")
@@ -510,12 +504,10 @@ class MessageHandler:
                 self.report_count += 1
                 # print("oldperson_data", self.old_person_data)
                 report_data["type"] = int(self.report_list_person[0][0], 16)
-                preperson_results = [x - y for x, y in zip(self.report_list_person[1][0], self.old_person_data)]
-                report_data["data"] = {index: value for index, value in enumerate(preperson_results)}
-
+                PersonFlow = [x - y for x, y in zip(self.report_list_person[1][0], self.old_person_data)]
+                report_data["Flow"] = {index: value for index, value in enumerate(PersonFlow)}
                 logger_person_sort.info("当前人流量差值为:{}".
-                                        format(preperson_results))
-
+                                        format(PersonFlow))
                 report_data["timestamp"] = ms_time_str
                 self.old_person_data = self.report_list_person[1][0]
                 self.report_list_person = [[], []]
@@ -542,15 +534,17 @@ class MessageHandler:
             self.publish_events()
             self.publish_report_data()
             current_time = rospy.Time.now()
-            if current_time >= self.send_time1:
+            if current_time >= self.send_time_states:
                 self.publish_states()
-                self.send_time1 = rospy.Time.now() + rospy.Duration(METAINFO.state_publishTime)  # 设置下一次发送时间
-            if current_time >= self.send_time2:
+                self.send_time_states = rospy.Time.now() + rospy.Duration(METAINFO.state_publishTime)  # 设置下一次发送时间
+            if current_time >= self.send_time_report_vehicle_data:
                 self.publish_report_vehicle_data()
-                self.send_time2 = rospy.Time.now() + rospy.Duration(METAINFO.statistics_publishTime)  # 设置下一次发送时间
-            if current_time >= self.send_time3:
-                self.publish_report_person_data()
-                self.send_time3 = rospy.Time.now() + rospy.Duration(METAINFO.statistics_publishTime)  # 设置下一次发送时间
+                self.send_time_report_vehicle_data = rospy.Time.now() + rospy.Duration(
+                    METAINFO.statistics_publishTime)  # 设置下一次发送时间
+            # if current_time >= self.send_time_report_person_data:
+            #     self.publish_report_person_data()
+            #     self.send_time_report_person_data = rospy.Time.now() + rospy.Duration(
+            #         METAINFO.statistics_publishTime)  # 设置下一次发送时间
             # rate = rospy.Rate(1)
             # rate.sleep()
             rospy.sleep(0.1)  # 控制循环的频率和响应时间

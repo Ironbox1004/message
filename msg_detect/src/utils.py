@@ -25,8 +25,8 @@ def merge_list(*args,
 
 
 def ros2bbox_2d(
-        ros_result:list
-                ):
+        ros_result: list
+):
     frame_id = ros_result.frame_id
     frame_name = ros_result.frame_name
 
@@ -190,7 +190,7 @@ class RegionalJudgmentSort:
         }
 
     def VehicleJudgment(self,
-                        lists:list) -> None:
+                        lists: list) -> None:
         self.classified_lists.clear()
         self.distances.clear()
         self.nums.clear()
@@ -220,7 +220,7 @@ class RegionalJudgmentSort:
         return self.distances, self.nums
 
 
-class VeSortCount:
+class SortCount:
     def __init__(self,
                  up_count=None,
                  down_count=None,
@@ -233,16 +233,16 @@ class VeSortCount:
                  last_track_id=None,
                  angle=None
                  ):
-        self.up_count = up_count if up_count is not None else [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        self.down_count = down_count if down_count is not None else [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        self.already_counted = already_counted if already_counted is not None else deque(maxlen=1)
-        self.class_counter = class_counter if class_counter is not None else Counter()
-        self.paths = paths if paths is not None else {}
-        self.total_counter = total_counter if total_counter is not None else 0
-        self.track_cls = track_cls if track_cls is not None else 0
-        self.total_track = total_track if total_track is not None else 0
-        self.last_track_id = last_track_id if last_track_id is not None else -1
-        self.angle = angle if angle is not None else -1
+        self.up_count = up_count or [0] * 6
+        self.down_count = down_count or [0] * 6
+        self.already_counted = already_counted or deque(maxlen=100)
+        self.class_counter = class_counter or Counter()
+        self.paths = paths or {}
+        self.total_counter = total_counter or 0
+        self.track_cls = track_cls or 0
+        self.total_track = total_track or 0
+        self.last_track_id = last_track_id or -1
+        self.angle = angle or -1
 
     def _tlbr_midpoint(self,
                        box: list):
@@ -251,7 +251,8 @@ class VeSortCount:
         :return: midpoint of box
         """
         minX, minY, maxX, maxY = box
-        midpoint = (int((minX + maxX) / 2), int((minY + maxY) / 2))  # minus y coordinates to get proper xy format
+        midpoint = (
+        (int(minX) + int(maxX)) / 2, (int(minY) + int(maxY)) / 2)  # minus y coordinates to get proper xy format
         return midpoint
 
     def _ccw(self,
@@ -290,46 +291,49 @@ class VeSortCount:
         y = midpoint[1] - previous_midpoint[1]
         return math.degrees(math.atan2(y, x))
 
-    def veSortCount(self,
-                    sort_results,
-                    line: list,
-                    sort_label: list):
+    def SortCountCal(self,
+                     sort_results,
+                     line: list,
+                     sort_label: list):
+
         if len(sort_results) > 0:
             for track in sort_results:
                 bbox = track[:4]
                 track_id = int(track[4])
-                label = track[-1]
-                midpoint = self._tlbr_midpoint(bbox)
-                origin_midpoint = (midpoint[0], 1920 - midpoint[1])  # 1080==im.shape[0]
+                label = int(track[-1])
+                if label in sort_label:
+                    self.track_cls = label
+                    midpoint = self._tlbr_midpoint(bbox)
+                    origin_midpoint = (midpoint[0], 1920 - midpoint[1])  # 1080==im.shape[0]
 
-                if track_id not in self.paths and label in sort_label:
-                    self.paths[track_id] = deque(maxlen=2)
-                    self.total_track = track_id
+                    if track_id not in self.paths:
+                        self.paths[track_id] = deque(maxlen=2)
+                        self.total_track = track_id
 
-                self.paths[track_id].append(midpoint)
-                previous_midpoint = self.paths[track_id][0]
-                origin_previous_midpoint = (previous_midpoint[0], 1920 - previous_midpoint[1])  # 1080==im.shape[0]
+                    self.paths[track_id].append(midpoint)
+                    previous_midpoint = self.paths[track_id][0]
+                    origin_previous_midpoint = (previous_midpoint[0], 1920 - previous_midpoint[1])  # 1080==im.shape[0]
 
-                for i in range(len(line)):
+                    for i in range(len(line)):
 
-                    if self._intersect(midpoint, previous_midpoint, line[i][0], line[i][1]) \
-                            and track_id not in self.already_counted:
+                        if self._intersect(midpoint, previous_midpoint, line[i][0], line[i][1]) \
+                                and track_id not in self.already_counted:
 
-                        self.class_counter[self.track_cls] += 1
-                        self.total_counter += 1
+                            self.class_counter[self.track_cls] += 1
+                            self.total_counter += 1
 
-                        self.already_counted.append(track_id)  # Set already counted for ID to true.
+                            self.already_counted.append(track_id)  # Set already counted for ID to true.
 
-                        self.angle = self._vector_angle(origin_midpoint, origin_previous_midpoint)
+                            self.angle = self._vector_angle(origin_midpoint, origin_previous_midpoint)
 
-                        if self.angle > 0:
-                            self.up_count[i] += 1
+                            if self.angle > 0:
+                                self.up_count[i] += 1
 
-                        if self.angle < 0:
-                            self.down_count[i] += 1
+                            if self.angle < 0:
+                                self.down_count[i] += 1
 
-    def getVeSortCountResult(self):
-        return self.up_count, self.down_count
+    def getSortCountResults(self):
+        return self.class_counter, [x + y for x, y in zip(self.up_count, self.down_count)]
 
 
 class PeSortCount:
@@ -396,6 +400,7 @@ class PeSortCount:
     def getPeSortCountResult(self):
         return self.count
 
+
 class ReverseVehicle:
     def __init__(self, count: int, last_seen_time: float):
         self.count = count
@@ -439,7 +444,7 @@ class ReverseDrivingDetector:
                 self.count_map[id].last_seen_time = current_time
 
             logger_reverse_driving.info(
-                "checkForReverseDriving:id"+str(id)+" count"+str(self.count_map[id].count))
+                "checkForReverseDriving:id" + str(id) + " count" + str(self.count_map[id].count))
 
             # 当检测到当前id车辆的逆行次数超过ReverseDriving.COUNT时，触发逆行事件报警，并将该车的逆行计数清零
             if self.count_map[id].count >= ReverseDriving.COUNT:
@@ -553,14 +558,14 @@ class CongestionDetector:
             # 遍历map中的所有目标物，计算它最后出现的时间距离现在多久，如果超过Congestion.TIME_INTERVAL，认为已经超过统计的要求时间，该目标物不再有价值
             for target_id, target in list(self.m_targets.items()):
                 elapsed_time = (
-                    current_time - target.last_seen_time).total_seconds()
+                        current_time - target.last_seen_time).total_seconds()
                 if elapsed_time > Congestion.TIME_INTERVAL:
                     self.total_time -= self.m_targets[target_id].duration_time
                     if self.total_time < 0.00001:
                         self.total_time = 0
                     del self.m_targets[target_id]
                     self.m_vehicle_counts -= 1
-                    logger_congestion.info("vehicle remove area id"+str(target_id))
+                    logger_congestion.info("vehicle remove area id" + str(target_id))
                 # 如果在统计周期内，但是大于Congestion.DEPARTURE_TIME，表示该车已经这么多秒没有出现在视野中，视为已经离开，那就把这辆车的数据统计到总时长和车辆计数中。
                 elif elapsed_time > Congestion.DEPARTURE_TIME:
                     if target.flag != True:
@@ -571,8 +576,8 @@ class CongestionDetector:
                         if self.m_targets[target_id].duration_time > 2:
                             self.total_time += (current_time -
                                                 target.enter_time).total_seconds() - Congestion.DEPARTURE_TIME
-                            logger_congestion.info("cal vechicle driving time info id"+str(
-                                target_id)+" total time"+str(self.m_targets[target_id].duration_time))
+                            logger_congestion.info("cal vechicle driving time info id" + str(
+                                target_id) + " total time" + str(self.m_targets[target_id].duration_time))
                             self.m_targets[target_id].flag = True
                             self.m_vehicle_counts += 1
                         # logger.info("cal vechicle info id"+str(target_id))
@@ -596,7 +601,7 @@ class CongestionDetector:
             self.m_average_speed = 0
         else:
             self.m_average_speed = Congestion.ROAD_LENGTH * \
-                self.m_vehicle_counts / self.total_time * 3.6
+                                   self.m_vehicle_counts / self.total_time * 3.6
         # logger.info("cal get_average_speed "+str(self.m_average_speed))
         return self.m_average_speed
 

@@ -80,7 +80,8 @@ class MESSAGE:
     report_data = {
         "type": None,
         "codec": 0x02,
-        "data": [],
+        "Flow": [],
+        "ClassCounter": [],
         "timestamp": None
     }
 
@@ -191,7 +192,9 @@ class event_data:
 
 
 class report_data:
-    queueLength = []
+    AllCounts = []
+    ClassCounter = []
+
     # timestamp = None
 
 
