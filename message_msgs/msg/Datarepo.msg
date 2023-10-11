@@ -1,0 +1,9 @@
+uint8[] queueLengths
+uint8 sqeNum
+uint8 rsuId
+uint8 rsuEsn
+string protocolVersion
+float32 timestamp
+float32 ack
+float32 startTime
+float32 endTime
